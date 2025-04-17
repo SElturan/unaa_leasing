@@ -7,7 +7,7 @@ from .models import  (
 class ClientSerializers(serializers.ModelSerializer):
     class Meta:
         model = Client
-        fields = ['id', 'fio', 'email', 'whatsapp']
+        fields = ['id', 'fio', 'phone', 'email', 'whatsapp']
 
 class ClientCarSerializers(serializers.ModelSerializer):
     class Meta:
@@ -71,7 +71,7 @@ class AdCarsSerializers(serializers.ModelSerializer):
         fields = ['id', 'car_name', 'car_model', 'car_year', 'car_color', 'price', 'first_image']
 
     def get_first_image(self, obj):
-        first_img = obj.images_ad_car.first()
+        first_img = obj.images_ad_cars.first()
         if first_img and first_img.image:
             return first_img.image.url
         return None

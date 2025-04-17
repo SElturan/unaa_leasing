@@ -162,6 +162,11 @@ CORS_ORIGIN_WHITELIST = [
     'http://0:0:0:0:8000',
     'http://172.18.0.1:8001',
 ]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://0:0:0:0:8000',
+    'https://unaa-leasing-admin.su/',
+]
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # или другой брокер сообщений
 CELERY_ACCEPT_CONTENT = ['json']
@@ -173,6 +178,8 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
 }
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 JAZZMIN_SETTINGS = {
     "site_title": "unaa_leasing",
@@ -188,7 +195,7 @@ JAZZMIN_SETTINGS = {
     # Welcome text on the login screen
     "welcome_sign": "Добро пожаловать!",
     # Copyright on the footer
-    "copyright": "kfl",
+    "copyright": "unaa_leasing",
     # List of model admins to search from the search bar, search bar omitted if excluded
     # If you want to use a single search field you dont need to use a list, you can use a simple string
     "search_model": ["auth.User", "auth.Group"],
