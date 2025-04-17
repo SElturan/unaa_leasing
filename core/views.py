@@ -13,7 +13,7 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar
+    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient
 )
 
 from .serializers import (
@@ -158,11 +158,21 @@ class CreditCalculatorListAPIView(ListAPIView):
         return Response(results)
     
 class ContactClientCreateAPIView(CreateAPIView):
-    serializer_class = ContactClientSerializers
+    serializer_class = ContactClientSerializers  # обычный сериализатор
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(client=self.request.user.client)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+
+        client = request.user.client
+        contacts = [
+            ContactClient(client=client, **contact)
+            for contact in serializer.validated_data
+        ]
+        ContactClient.objects.bulk_create(contacts)
+
+        return Response({"status": "created"}, status=status.HTTP_201_CREATED)
 
 class LocationClientCreateAPIView(CreateAPIView):
     serializer_class = LocationClientSerializers

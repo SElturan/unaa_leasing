@@ -94,6 +94,18 @@ class ContactClientSerializers(serializers.ModelSerializer):
         model = ContactClient
         fields = ['id', 'name', 'phone']
 
+class ContactClientBulkCreateSerializer(serializers.Serializer):
+    contacts = ContactClientSerializers(many=True)
+
+    def create(self, validated_data):
+        client = self.context['request'].user.client
+        contacts_data = validated_data['contacts']
+        contact_objs = [
+            ContactClient(client=client, **contact) for contact in contacts_data
+        ]
+        return ContactClient.objects.bulk_create(contact_objs)
+
+
 class LocationClientSerializers(serializers.ModelSerializer):
     class Meta:
         model = LocationClient
