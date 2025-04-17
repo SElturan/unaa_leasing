@@ -78,7 +78,7 @@ class AdCarsSerializers(serializers.ModelSerializer):
 
 
 class AdCarsDetailSerializers(serializers.ModelSerializer):
-    images = ImagesAdCarsSerializer(many=True, source='images_ad_car')
+    images = ImagesAdCarsSerializer(many=True, source='images_ad_cars')
 
     class Meta:
         model = AdCars
