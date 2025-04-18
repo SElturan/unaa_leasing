@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',  # required for Django collectstatic discovery
     'django_filters',
     'phonenumber_field',
+    'channels',
 
     # apps
     'core.apps.CoreConfig',
@@ -180,6 +181,16 @@ SIMPLE_JWT = {
 }
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+ASGI_APPLICATION = 'unaa_leasing.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 JAZZMIN_SETTINGS = {
     "site_title": "unaa_leasing",

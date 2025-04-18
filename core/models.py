@@ -158,3 +158,17 @@ class CalculateInfo(models.Model):
 
     def __str__(self):
         return f"Расчет"
+
+
+class Send_Message(models.Model):
+    message = models.TextField(verbose_name='Сообщение')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+
+    class Meta:
+        verbose_name = 'Рассылка'
+        verbose_name_plural = 'Рассылки'
+
+    def __str__(self):
+        return self.message
+    
