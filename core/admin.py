@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message
 )
 
 
@@ -97,3 +97,10 @@ class CalculateInfoAdmin(admin.ModelAdmin):
     list_filter = ['leasing_term', 'interest_rate']
 
 admin.site.register(CalculateInfo, CalculateInfoAdmin)
+
+class SendMessageAdmin(admin.ModelAdmin):
+    list_display = ['id', 'message', 'created_at']
+    search_fields = ['message']
+    ordering = ['created_at']
+
+admin.site.register(Send_Message, SendMessageAdmin)

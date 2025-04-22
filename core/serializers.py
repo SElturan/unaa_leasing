@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import  (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message
 )
 
 class ClientSerializers(serializers.ModelSerializer):
@@ -50,10 +50,10 @@ class ClientCarDetailSerializers(serializers.ModelSerializer):
 
 class InsuranceClientSerializers(serializers.ModelSerializer):
     client_car_full_name = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = InsuranceClient
-        fields = ['id','client_car_full_name', 'insurance_company', 'policy_number', 'start_date', 'end_date']
+        fields = ['id','client','client_car_full_name', 'insurance_company', 'policy_number', 'start_date', 'end_date']
     
     def get_client_car_full_name(self, obj):
         return f"{obj.client.car_name} {obj.client.car_model} {obj.client.car_year}"
@@ -107,6 +107,18 @@ class ContactClientBulkCreateSerializer(serializers.Serializer):
 
 
 class LocationClientSerializers(serializers.ModelSerializer):
+    fio = serializers.CharField(source='client.fio', read_only=True)
+    class Meta:
+        model = LocationClient
+        fields = ['id', 'fio' ,'latitude', 'longitude']
+
+class LocationClientDetailSerializers(serializers.ModelSerializer):
+
     class Meta:
         model = LocationClient
         fields = ['id', 'latitude', 'longitude']
+
+class SendMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Send_Message
+        fields = ['id', 'message', 'created_at', 'updated_at']

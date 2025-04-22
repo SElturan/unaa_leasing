@@ -1,6 +1,6 @@
 from django.urls import re_path
-from .consumers import InterviewsConsumer
+from . import consumers
 
 websocket_urlpatterns = [
-    re_path(r'ws/interviews/$', InterviewsConsumer.as_asgi()),
+    re_path(r'ws/messages/$', consumers.BroadcastConsumer.as_asgi()),
 ]

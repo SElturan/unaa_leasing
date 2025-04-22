@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from datetime import date, datetime, timedelta
+from django.utils import timezone
 from django_filters import rest_framework as django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticated
@@ -13,11 +14,12 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient
+    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, Send_Message, LocationClient
 )
 
 from .serializers import (
-    ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, ContactClientSerializers, LocationClientSerializers
+    ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, 
+    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers
 )
 
 class ClientInfoListAPIView(ListAPIView):
@@ -31,6 +33,23 @@ class ClientInfoListAPIView(ListAPIView):
             return Response({'detail': 'У пользователя нет привязанного клиента'}, status=404)
 
         client = user.client
+        cars = ClientCar.objects.filter(client=client)
+
+        client_data = ClientSerializers(client).data
+        car_data = ClientCarSerializers(cars, many=True).data
+
+        return Response({
+            'client': client_data,
+            'cars': car_data
+        })
+
+class ClientInfoRetrieveAPIView(RetrieveAPIView):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializers
+    lookup_field = 'id'
+    
+    def retrieve(self, request, *args, **kwargs):
+        client = self.get_object()
         cars = ClientCar.objects.filter(client=client)
 
         client_data = ClientSerializers(client).data
@@ -173,13 +192,41 @@ class ContactClientCreateAPIView(CreateAPIView):
         ContactClient.objects.bulk_create(contacts)
 
         return Response({"status": "created"}, status=status.HTTP_201_CREATED)
+    
+class ContactClientListIDAPIView(ListAPIView):
+    serializer_class = ContactClientSerializers
+    lookup_field = 'client_id'
 
+    def get_queryset(self):
+        return ContactClient.objects.filter(client_id=self.kwargs['client_id'])
+    
 class LocationClientCreateAPIView(CreateAPIView):
     serializer_class = LocationClientSerializers
-    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(client=self.request.user.client)
+
+class LocationClientListAPIView(ListAPIView):
+    serializer_class = LocationClientSerializers
+    queryset = LocationClient.objects.all()
+
+class LocationClientRetrieveAPIView(RetrieveAPIView):
+    queryset = LocationClient.objects.all()
+    serializer_class = LocationClientDetailSerializers
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        location = self.get_object()
+        client = location.client
+        client_data = ClientSerializers(client).data
+        client_car = ClientCar.objects.filter(client=client).first()
+        location_data = LocationClientDetailSerializers(location).data
+
+        return Response({
+            'client': client_data,
+            'car': ClientCarSerializers(client_car).data if client_car else None,
+            'location': location_data
+        })
 
 class InsuranceClientListAPIView(ListAPIView):
     serializer_class = InsuranceClientSerializers
@@ -191,4 +238,17 @@ class InsuranceClientListAPIView(ListAPIView):
         if queryset:
             return queryset
         return InsuranceClient.objects.none()
+
+class InsuranceClientListByClientIdAPIView(ListAPIView):
+    serializer_class = InsuranceClientSerializers
+    lookup_field = 'client_id'
+
+    def get_queryset(self):
+        return InsuranceClient.objects.filter(client__client_id=self.kwargs['client_id'])
     
+class LastThreeDaysMessagesView(ListAPIView):
+    serializer_class = SendMessageSerializer
+
+    def get_queryset(self):
+        three_days_ago = timezone.now() - timedelta(days=3)
+        return Send_Message.objects.filter(created_at__gte=three_days_ago)

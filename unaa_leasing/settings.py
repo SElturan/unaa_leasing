@@ -167,6 +167,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://0:0:0:0:8000',
     'https://unaa-leasing-admin.su/',
+    'http://192.168.159.219/',
 ]
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # или другой брокер сообщений
@@ -187,7 +188,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [('redis', 6379)],
         },
     },
 }
