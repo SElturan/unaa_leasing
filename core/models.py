@@ -88,7 +88,7 @@ class InsuranceClient(models.Model):
 class ContactClient(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='contacts')
     name = models.CharField(max_length=255, verbose_name='Имя')
-    phone = models.CharField(max_length=50, verbose_name='Телефон')
+    phone = models.CharField(max_length=50, verbose_name='Телефон', unique=True)
 
     class Meta:
         verbose_name = 'Контакт клиента'

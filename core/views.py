@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      UpdateAPIView, mixins, RetrieveAPIView, CreateAPIView)
+from django.db.models import OuterRef, Subquery
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
@@ -177,11 +178,24 @@ class CreditCalculatorListAPIView(ListAPIView):
         return Response(results)
     
 class ContactClientCreateAPIView(CreateAPIView):
-    serializer_class = ContactClientSerializers  # обычный сериализатор
+    serializer_class = ContactClientSerializers
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, many=True)
+        raw_data = request.data
+
+        if not isinstance(raw_data, list):
+            return Response({"error": "Ожидается список контактов"}, status=status.HTTP_400_BAD_REQUEST)
+
+        phones = [item.get("phone") for item in raw_data if "phone" in item]
+        existing_phones = set(
+            ContactClient.objects.filter(phone__in=phones).values_list("phone", flat=True)
+        )
+
+        new_data = [item for item in raw_data if item.get("phone") not in existing_phones]
+        skipped_data = [item for item in raw_data if item.get("phone") in existing_phones]
+
+        serializer = self.get_serializer(data=new_data, many=True)
         serializer.is_valid(raise_exception=True)
 
         client = request.user.client
@@ -191,7 +205,12 @@ class ContactClientCreateAPIView(CreateAPIView):
         ]
         ContactClient.objects.bulk_create(contacts)
 
-        return Response({"status": "created"}, status=status.HTTP_201_CREATED)
+        return Response({
+            "status": "created",
+            "added": len(contacts),
+            "skipped": len(skipped_data),
+            "skipped_contacts": skipped_data,
+        }, status=status.HTTP_201_CREATED)
     
 class ContactClientListIDAPIView(ListAPIView):
     serializer_class = ContactClientSerializers
@@ -208,7 +227,22 @@ class LocationClientCreateAPIView(CreateAPIView):
 
 class LocationClientListAPIView(ListAPIView):
     serializer_class = LocationClientSerializers
-    queryset = LocationClient.objects.all()
+
+    def get_queryset(self):
+        # Подзапрос: получить последнюю локацию по каждому клиенту
+        latest_location_subquery = LocationClient.objects.filter(
+            client=OuterRef('client')
+        ).order_by('-id')  # или '-created_at' если есть
+
+        return LocationClient.objects.filter(
+            id__in=LocationClient.objects.filter(
+                id__in=Subquery(
+                    LocationClient.objects.filter(
+                        client=OuterRef('client')
+                    ).order_by('-id').values('id')[:1]
+                )
+            )
+        ).distinct('client')
 
 class LocationClientRetrieveAPIView(RetrieveAPIView):
     queryset = LocationClient.objects.all()
@@ -216,16 +250,20 @@ class LocationClientRetrieveAPIView(RetrieveAPIView):
     lookup_field = 'id'
 
     def retrieve(self, request, *args, **kwargs):
+        # получаем клиента через объект локации (только чтобы узнать клиента)
         location = self.get_object()
         client = location.client
-        client_data = ClientSerializers(client).data
-        client_car = ClientCar.objects.filter(client=client).first()
-        location_data = LocationClientDetailSerializers(location).data
+
+        # последняя геолокация клиента
+        latest_location = LocationClient.objects.filter(client=client).order_by('-id').first()
+
+        # все машины клиента
+        client_cars = ClientCar.objects.filter(client=client)
 
         return Response({
-            'client': client_data,
-            'car': ClientCarSerializers(client_car).data if client_car else None,
-            'location': location_data
+            'client': ClientSerializers(client).data,
+            'cars': ClientCarSerializers(client_cars, many=True).data,
+            'location': LocationClientDetailSerializers(latest_location).data if latest_location else None
         })
 
 class InsuranceClientListAPIView(ListAPIView):
@@ -252,3 +290,10 @@ class LastThreeDaysMessagesView(ListAPIView):
     def get_queryset(self):
         three_days_ago = timezone.now() - timedelta(days=3)
         return Send_Message.objects.filter(created_at__gte=three_days_ago)
+    
+
+class ClientAllListAPIView(ListAPIView):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializers
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['fio', 'phone']

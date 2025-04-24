@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
     ContactClientCreateAPIView, LocationClientCreateAPIView, InsuranceClientListAPIView, LastThreeDaysMessagesView, 
-    ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView
+    ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView,
+    ClientAllListAPIView
 )
 
 urlpatterns = [
@@ -21,5 +22,5 @@ urlpatterns = [
     path('api/admin/location-client/', LocationClientListAPIView.as_view(), name='location-client-list'),
     path('api/admin/location-client/<int:id>/', LocationClientRetrieveAPIView.as_view(), name='location-client-detail'),
     path('api/admin/insurance-client/<int:client_id>/', InsuranceClientListByClientIdAPIView.as_view(), name='insurance-client-list-by-client-id'),
-
+    path('api/admin/all-client-list/', ClientAllListAPIView.as_view(), name='all-client-list'),
 ]
