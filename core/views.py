@@ -53,13 +53,15 @@ class ClientInfoRetrieveAPIView(RetrieveAPIView):
         client = self.get_object()
         cars = ClientCar.objects.filter(client=client)
 
-        client_data = ClientSerializers(client).data
-        car_data = ClientCarSerializers(cars, many=True).data
+        # получаем последнюю геолокацию
+        latest_location = LocationClient.objects.filter(client=client).order_by('-id').first()
 
         return Response({
-            'client': client_data,
-            'cars': car_data
+            'client': ClientSerializers(client).data,
+            'cars': ClientCarSerializers(cars, many=True).data,
+            'location': LocationClientDetailSerializers(latest_location).data if latest_location else None
         })
+
     
 class ClientCarDetailAPIView(RetrieveAPIView):
     queryset = ClientCar.objects.all()
