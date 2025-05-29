@@ -12,6 +12,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_superuser = models.BooleanField('Суперпользователь', default=False)
     is_active = models.BooleanField('Активен', default=False)
     is_delete = models.BooleanField('Удален', default=False)
+    expo_push_token = models.CharField('Expo Push Token', max_length=255, blank=True, null=True)
     registered_at = models.DateTimeField('Дата регистрации', auto_now_add=True)
     updated_at = models.DateTimeField('Дата обновления', auto_now=True)
     

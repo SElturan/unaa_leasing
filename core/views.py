@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      UpdateAPIView, mixins, RetrieveAPIView, CreateAPIView)
+from django.db.models import Prefetch
 from django.db.models import OuterRef, Subquery
 
 from .models import (
@@ -299,3 +300,56 @@ class ClientAllListAPIView(ListAPIView):
     serializer_class = ClientSerializers
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['fio', 'phone']
+
+class ClientReportListView(ListAPIView):
+    def list(self, request, *args, **kwargs):
+        clients = Client.objects.prefetch_related(
+            Prefetch('client_car__insurances')
+        )
+
+        report = []
+        for client in clients:
+            for car in client.client_car.all():
+                osago = next((ins for ins in car.insurances.all() if ins.insurance_company == 'OSAGO'), None)
+                kasko = next((ins for ins in car.insurances.all() if ins.insurance_company == 'KASKO'), None)
+
+                report.append({
+                    "client_fio": client.fio,
+                    "car_number": car.car_number,
+                    "car_name": car.car_name,
+                    "car_model": car.car_model,
+                    "car_year": car.car_year,
+                    "OSAGO_end": osago.end_date if osago else None,
+                    "KASKO_end": kasko.end_date if kasko else None,
+                })
+
+        return Response(report, status=status.HTTP_200_OK)
+    
+class ClientReportOneView(RetrieveAPIView):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializers
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        client = self.get_object()
+        cars = client.client_car.all()
+
+        report = []
+        for car in cars:
+            osago = next((ins for ins in car.insurances.all() if ins.insurance_company == 'OSAGO'), None)
+            kasko = next((ins for ins in car.insurances.all() if ins.insurance_company == 'KASKO'), None)
+
+            report.append({
+
+                "car_number": car.car_number,
+                "car_name": car.car_name,
+                "car_model": car.car_model,
+                "car_year": car.car_year,
+                "OSAGO_end": osago.end_date if osago else None,
+                "KASKO_end": kasko.end_date if kasko else None,
+            })
+
+        return Response({
+            "client_fio": client.fio,
+            "report": report
+        }, status=status.HTTP_200_OK)

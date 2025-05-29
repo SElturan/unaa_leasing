@@ -4,9 +4,9 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from accounts.models import User
-from accounts.serializers import UserLoginSerializer
+from accounts.serializers import UserLoginSerializer, ExpoPushTokenSerializer
 
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
@@ -56,3 +56,18 @@ class CustomTokenRefreshView(TokenRefreshView):
 
         except Exception as e:
             return Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+class ExpoPushTokenView(generics.UpdateAPIView):
+    serializer_class = ExpoPushTokenSerializer
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)

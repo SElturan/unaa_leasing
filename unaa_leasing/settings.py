@@ -22,7 +22,9 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+# ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS = ['*']
+
 
 
 # Application definition
@@ -46,6 +48,7 @@ INSTALLED_APPS = [
     'django_filters',
     'phonenumber_field',
     'channels',
+    'django_celery_beat',
 
     # apps
     'core.apps.CoreConfig',
@@ -170,9 +173,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.159.219/',
 ]
 
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # или другой брокер сообщений
+CELERY_BROKER_URL = 'redis://redis:6379/0'  # или другой брокер сообщений
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=30),

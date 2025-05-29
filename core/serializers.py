@@ -122,3 +122,5 @@ class SendMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Send_Message
         fields = ['id', 'message', 'created_at', 'updated_at']
+
+ 

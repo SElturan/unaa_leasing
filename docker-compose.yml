@@ -46,6 +46,29 @@ services:
       - "8001:8001"
     volumes:
       - .:/app
+  
+  celery:
+    build: .
+    command: bash -c "celery -A unaa_leasing worker --loglevel=info"
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - app
+      - redis
+    volumes:
+      - .:/app
+  celery-beat:
+    build: .
+    command: celery -A unaa_leasing beat --loglevel=info
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - app
+      - redis
+    volumes:
+      - .:/app
 
 volumes:
   pgdata:

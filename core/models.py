@@ -15,7 +15,8 @@ class Client(models.Model):
         return self.fio
 
 class ClientCar(models.Model):
-    client = models.ForeignKey( Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='client_car')
+    client = models.ForeignKey( Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='client_car') 
+    client_guid = models.UUIDField(null=True, blank=True, unique=True, verbose_name='GUID клиента из 1С')
     car_name = models.CharField(max_length=255, verbose_name='Название автомобиля')
     car_model = models.CharField(max_length=255, verbose_name='Модель автомобиля')
     car_year = models.IntegerField(verbose_name='Год автомобиля')
@@ -23,12 +24,18 @@ class ClientCar(models.Model):
     car_vin = models.CharField(null=True, blank=True, max_length=50, verbose_name='VIN номер')
     car_number = models.CharField(null=True, blank=True, max_length=50, verbose_name='Номер автомобиля')
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма лизинга / основного долга')
+    loan_guid = models.UUIDField(null=True, blank=True, unique=True, verbose_name='GUID кредита из 1С')
     paid_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Погашено')
     remaining_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток к погашению')
 
     class Meta:
         verbose_name = 'Авто клиентов'
         verbose_name_plural = 'Авто клиентов'
+ 
+        constraints = [
+            models.UniqueConstraint(fields=['client_guid'], name='unique_client_guid'),
+            models.UniqueConstraint(fields=['loan_guid'], name='unique_loan_guid')
+        ]
 
     def __str__(self):
         return self.client.fio
@@ -48,14 +55,19 @@ class ImagesClientCar(models.Model):
         return self.client_car.client.fio
     
 class RepaymentSchedule(models.Model):
+    IS_PAID_CHOICES = [
+        ('is_paid', 'Оплачено'),
+        ('not_paid', 'Не оплачено'),
+        ('in_process', 'В ожидании')
+    ]
     car_client = models.ForeignKey(ClientCar, on_delete=models.CASCADE, verbose_name='Авто клиента', related_name='repayment_schedules')
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма лизинга / основного долга')
-    main_debt = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Основной долг')
-    interest = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Погашение начисл.')
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма лизинга / основного долга', null=True, blank=True)
+    main_debt = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Основной долг', null=True, blank=True)
+    interest = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Погашение начисл.',null=True, blank=True)
     total_payment = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Итог к погашению')
     paid_date = models.DateField(null=True, blank=True, verbose_name='Дата погашения')
     overdue_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Просрочки')
-    is_paid = models.BooleanField(default=False, verbose_name='Оплачен')
+    is_paid = models.CharField( choices=IS_PAID_CHOICES, verbose_name='Оплата',)
 
     class Meta:
         verbose_name = 'График погашения'
