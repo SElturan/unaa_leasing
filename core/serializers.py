@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import  (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification
 )
 
 class ClientSerializers(serializers.ModelSerializer):
@@ -119,8 +119,26 @@ class LocationClientDetailSerializers(serializers.ModelSerializer):
         fields = ['id', 'latitude', 'longitude']
 
 class SendMessageSerializer(serializers.ModelSerializer):
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
     class Meta:
         model = Send_Message
         fields = ['id', 'message', 'created_at', 'updated_at']
 
+    def get_created_at(self, obj):
+        return obj.created_at.strftime('%d %B %Y, %H:%M')
+
+    def get_updated_at(self, obj):
+        return obj.updated_at.strftime('%d %B %Y, %H:%M')
  
+class NotificationSerializer(serializers.ModelSerializer):
+    created_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'created_at']
+        read_only_fields = ['created_at']
+
+    def get_created_at(self, obj):
+        return obj.created_at.strftime('%d %B %Y, %H:%M')

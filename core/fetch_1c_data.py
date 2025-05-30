@@ -95,7 +95,7 @@ def fetch_new_clients_from_1c():
                                         'interest': interest,
                                         'total_payment': total_amount,
                                         'overdue_amount': Decimal(str(schedule.get('overdue_amount', 0))),
-                                        'is_paid': 'paid' if str(schedule.get('is_paid')).lower() == "true" else 'not_paid'
+                                        'is_paid': 'is_paid' if str(schedule.get('is_paid')).lower() == "true" else 'not_paid'
                                     }
                                 )
 

@@ -184,3 +184,14 @@ class Send_Message(models.Model):
     def __str__(self):
         return self.message
     
+class Notification(models.Model):
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, verbose_name='Пользователь', related_name='notifications')
+    message = models.TextField(verbose_name='Сообщение')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+
+    class Meta:
+        verbose_name = 'Уведомление'
+        verbose_name_plural = 'Уведомления'
+
+    def __str__(self):
+        return self.user.phone

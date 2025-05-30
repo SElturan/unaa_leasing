@@ -16,12 +16,12 @@ from django.db.models import OuterRef, Subquery
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, Send_Message, LocationClient
+    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, Send_Message, LocationClient, Notification
 )
 
 from .serializers import (
     ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, 
-    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers
+    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer
 )
 
 class ClientInfoListAPIView(ListAPIView):
@@ -292,7 +292,15 @@ class LastThreeDaysMessagesView(ListAPIView):
 
     def get_queryset(self):
         three_days_ago = timezone.now() - timedelta(days=3)
-        return Send_Message.objects.filter(created_at__gte=three_days_ago)
+        return Send_Message.objects.filter(created_at__gte=three_days_ago).order_by('-created_at')
+
+class NotificationListView(ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Notification.objects.filter(user=user).order_by('-created_at')
     
 
 class ClientAllListAPIView(ListAPIView):

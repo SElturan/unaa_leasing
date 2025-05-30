@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification
 )
 
 
@@ -104,3 +104,10 @@ class SendMessageAdmin(admin.ModelAdmin):
     ordering = ['created_at']
 
 admin.site.register(Send_Message, SendMessageAdmin)
+
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['id','message', 'created_at']
+    search_fields = ['message']
+    ordering = ['created_at']
+
+admin.site.register(Notification, NotificationAdmin)

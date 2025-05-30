@@ -3,7 +3,7 @@ from .views import (
     ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
     ContactClientCreateAPIView, LocationClientCreateAPIView, InsuranceClientListAPIView, LastThreeDaysMessagesView, 
     ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView,
-    ClientAllListAPIView, ClientReportListView, ClientReportOneView
+    ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView
 )
 
 urlpatterns = [
@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/location-client-create/', LocationClientCreateAPIView.as_view(), name='location-client'),
     path('api/insurance-client-list/', InsuranceClientListAPIView.as_view(), name='insurance-client-list'),
     path('api/last-three-days-messages/', LastThreeDaysMessagesView.as_view(), name='last-three-days-messages'),
+    path('api/notification-list/', NotificationListView.as_view(), name='notification-list'),
     path('api/admin/contact-client/<int:client_id>/', ContactClientListIDAPIView.as_view(), name='contact-client-detail'),
     path('api/admin/client-info/<int:id>/', ClientInfoRetrieveAPIView.as_view(), name='client-info-detail'),
     path('api/admin/location-client/', LocationClientListAPIView.as_view(), name='location-client-list'),
@@ -25,4 +26,5 @@ urlpatterns = [
     path('api/admin/all-client-list/', ClientAllListAPIView.as_view(), name='all-client-list'),
     path('api/admin/client-report/', ClientReportListView.as_view(), name='client-report-list'),
     path('api/admin/client-report/<int:id>/', ClientReportOneView.as_view(), name='client-report-one'),
+    
 ]
