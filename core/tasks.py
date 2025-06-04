@@ -41,7 +41,7 @@ def send_notification_task():
                 Платёж по машине {car_model}, сумма: {total_payment} сом. Не забудьте оплатить во избежание просрочки.
                 Осталось {days_to} дней."""
         message_repayment_overdue = f"""Просрочка по платёжке",
-                Платёж по машине {car_model} просрочен на {days_overdue} дней. Сумма: {total_payment} сом."""
+                f"Платёж по машине {car_model} просрочен на {days_overdue} дней. Сумма: {total_payment} сом."""
 
         if not token:
             continue

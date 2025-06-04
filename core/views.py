@@ -13,6 +13,7 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      UpdateAPIView, mixins, RetrieveAPIView, CreateAPIView)
 from django.db.models import Prefetch
 from django.db.models import OuterRef, Subquery
+from drf_spectacular.utils import extend_schema
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
@@ -21,8 +22,9 @@ from .models import (
 
 from .serializers import (
     ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, 
-    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer
+    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer, LeasingCalcInputSerializer, LeasingResultSerializer
 )
+from .calculations import calculate_leasing
 
 class ClientInfoListAPIView(ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -360,4 +362,39 @@ class ClientReportOneView(RetrieveAPIView):
         return Response({
             "client_fio": client.fio,
             "report": report
+        }, status=status.HTTP_200_OK)
+    
+
+class LeasingCalcAPIView(APIView):
+    @extend_schema(
+        request=LeasingCalcInputSerializer,
+        responses=LeasingResultSerializer,
+        summary="Лизинговый калькулятор",
+        description="Возвращает сумму всех выплат, ежемесячный платёж и детализацию расходов.",
+        tags=["Лизинг"]
+    )
+    def post(self, request, *args, **kwargs):
+        input_serializer = LeasingCalcInputSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        data = input_serializer.validated_data
+
+        from decimal import Decimal
+        result = calculate_leasing(
+            car_price=Decimal(data['car_price']),
+            down_payment=Decimal(data['down_payment']),
+            leasing_term_months=int(data['leasing_term_months']),
+        )
+        comment = {
+            "car_total_cost": "Итоговая сумма, которую клиент заплатит за автомобиль со всеми расходами за весь срок.",
+            "monthly_payment": "Ежемесячный платёж по договору лизинга.",
+            "initial_payment_total": "Сумма, которую нужно внести в самом начале (первоначальный взнос, комиссия, ОСАГО).",
+            "details": {
+                "down_payment": "Первоначальный взнос (выбран клиентом).",
+                "commission": "Комиссия за рассмотрение (2% от суммы лизинга).",
+                "osago": "ОСАГО — обязательное страхование, фиксированная сумма."
+            }
+        }
+        return Response({
+            "result": result,
+            "description": comment
         }, status=status.HTTP_200_OK)

@@ -142,3 +142,16 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_created_at(self, obj):
         return obj.created_at.strftime('%d %B %Y, %H:%M')
+    
+
+class LeasingCalcInputSerializer(serializers.Serializer):
+    car_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    down_payment = serializers.DecimalField(max_digits=12, decimal_places=2)
+    leasing_term_months = serializers.IntegerField(min_value=1)
+    interest_rate_annual = serializers.DecimalField(max_digits=5, decimal_places=2)
+    
+class LeasingResultSerializer(serializers.Serializer):
+    car_total_cost = serializers.DecimalField(max_digits=12, decimal_places=2)
+    monthly_payment = serializers.DecimalField(max_digits=12, decimal_places=2)
+    initial_payment_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    details = serializers.DictField(child=serializers.DecimalField(max_digits=12, decimal_places=2))

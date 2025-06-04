@@ -17,7 +17,7 @@ app.autodiscover_tasks()
 CELERY_BEAT_SCHEDULE = {
     'send_notifications_daily': {
         'task': 'core.tasks.send_notification_task',
-        'schedule': timedelta(seconds=60),  # ежедневно в 10:00
+        'schedule': timedelta(seconds=10),  # ежедневно в 10:00
     },
 }
 
