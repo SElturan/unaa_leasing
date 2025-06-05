@@ -149,7 +149,7 @@ class LeasingCalcInputSerializer(serializers.Serializer):
     down_payment = serializers.DecimalField(max_digits=12, decimal_places=2)
     leasing_term_months = serializers.IntegerField(min_value=1)
     interest_rate_annual = serializers.DecimalField(max_digits=5, decimal_places=2)
-    
+
 class LeasingResultSerializer(serializers.Serializer):
     car_total_cost = serializers.DecimalField(max_digits=12, decimal_places=2)
     monthly_payment = serializers.DecimalField(max_digits=12, decimal_places=2)

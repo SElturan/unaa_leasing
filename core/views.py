@@ -61,7 +61,8 @@ class ClientInfoRetrieveAPIView(RetrieveAPIView):
 
         return Response({
             'client': ClientSerializers(client).data,
-            'cars': ClientCarSerializers(cars, many=True).data,
+            'cars': ClientCarDetailSerializers(cars, many=True).data,
+            'insurance': InsuranceClientSerializers(InsuranceClient.objects.filter(client__in=cars), many=True).data,
             'location': LocationClientDetailSerializers(latest_location).data if latest_location else None
         })
 
@@ -329,6 +330,11 @@ class ClientReportListView(ListAPIView):
                     "car_name": car.car_name,
                     "car_model": car.car_model,
                     "car_year": car.car_year,
+                    "car_total_cost": car.total_amount,
+                    "car_remaining_amount": car.remaining_amount,
+                    "car_paid_amount": car.paid_amount,
+                    "OSAGO_start": osago.start_date if osago else None,
+                    "KASKO_start": kasko.start_date if kasko else None,
                     "OSAGO_end": osago.end_date if osago else None,
                     "KASKO_end": kasko.end_date if kasko else None,
                 })
@@ -355,6 +361,11 @@ class ClientReportOneView(RetrieveAPIView):
                 "car_name": car.car_name,
                 "car_model": car.car_model,
                 "car_year": car.car_year,
+                "car_total_cost": car.total_amount,
+                "car_remaining_amount": car.remaining_amount,
+                "car_paid_amount": car.paid_amount,
+                "OSAGO_start": osago.start_date if osago else None,
+                "KASKO_start": kasko.start_date if kasko else None,
                 "OSAGO_end": osago.end_date if osago else None,
                 "KASKO_end": kasko.end_date if kasko else None,
             })
