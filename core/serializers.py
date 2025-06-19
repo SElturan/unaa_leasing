@@ -108,9 +108,10 @@ class ContactClientBulkCreateSerializer(serializers.Serializer):
 
 class LocationClientSerializers(serializers.ModelSerializer):
     fio = serializers.CharField(source='client.fio', read_only=True)
+    client_id = serializers.IntegerField(source='client.id', read_only=True)
     class Meta:
         model = LocationClient
-        fields = ['id', 'fio' ,'latitude', 'longitude']
+        fields = ['id', 'client_id','fio' ,'latitude', 'longitude']
 
 class LocationClientDetailSerializers(serializers.ModelSerializer):
 
