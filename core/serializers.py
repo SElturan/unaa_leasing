@@ -7,7 +7,7 @@ from .models import  (
 class ClientSerializers(serializers.ModelSerializer):
     class Meta:
         model = Client
-        fields = ['id', 'fio', 'phone', 'email', 'whatsapp']
+        fields = ['id', 'fio', 'phone', 'email', 'whatsapp', 'residence', 'registration_address']
 
 class ClientCarSerializers(serializers.ModelSerializer):
     class Meta:
@@ -44,8 +44,9 @@ class ClientCarDetailSerializers(serializers.ModelSerializer):
     class Meta:
         model = ClientCar
         fields = [
-            'id', 'client', 'car_name', 'car_model', 'car_year',
-            'car_color', 'car_vin', 'car_number', 'total_amount', 'paid_amount', 'remaining_amount', 'images'
+            'id', 'images','client', 'car_name', 'car_model', 'car_year',
+            'car_color', 'car_vin', 'car_number', 'total_amount', 'paid_amount', 'remaining_amount','due_days_principal', 
+            'due_days_interest', 'due_amount_principal', 'due_amount_interest', 'principal_balance', 'interest_balance', 
         ]
 
 class InsuranceClientSerializers(serializers.ModelSerializer):

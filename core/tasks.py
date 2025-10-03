@@ -1,15 +1,15 @@
 from celery import shared_task
-from .fetch_1c_data import fetch_new_clients_from_1c
+# from .fetch_1c_data import fetch_new_clients_from_1c
 from .models import RepaymentSchedule, InsuranceClient, Notification
 from datetime import date, timedelta
 from .expo_push import send_push_message
 from django.db.models import Q
 from accounts.models import User
 
-@shared_task
-def fetch_clients_task():
-    fetch_new_clients_from_1c()
-    return "Fetch clients task completed successfully."
+# @shared_task
+# def fetch_clients_task():
+#     fetch_new_clients_from_1c()
+#     return "Fetch clients task completed successfully."
 
 @shared_task
 def send_notification_task():
@@ -21,7 +21,7 @@ def send_notification_task():
     overdue_cutoff = today - timedelta(days=3)
 
     repayments = RepaymentSchedule.objects.filter(
-        Q(is_paid='not_paid') & (
+        Q(is_paid=False) & (
             Q(paid_date__range=soon_range) |
             Q(paid_date__lt=overdue_cutoff)
         )

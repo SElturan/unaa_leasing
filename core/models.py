@@ -6,6 +6,8 @@ class Client(models.Model):
     phone = models.CharField(null=True, blank=True, max_length=50, verbose_name='Телефон')
     email = models.EmailField(null=True, blank=True, max_length=255, verbose_name='Email')
     whatsapp = models.CharField(null=True, blank=True, max_length=50, verbose_name='WhatsApp')
+    residence = models.CharField(null=True, blank=True, max_length=255, verbose_name='Место жительства')
+    registration_address = models.CharField(null=True, blank=True, max_length=255, verbose_name='Регистрация')
 
     class Meta:
         verbose_name = 'Клиент'
@@ -17,6 +19,7 @@ class Client(models.Model):
 class ClientCar(models.Model):
     client = models.ForeignKey( Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='client_car') 
     client_guid = models.UUIDField(null=True, blank=True, unique=True, verbose_name='GUID клиента из 1С')
+    deal_number = models.CharField(null=True, blank=True, max_length=50, verbose_name='Номер сделки')
     car_name = models.CharField(max_length=255, verbose_name='Название автомобиля')
     car_model = models.CharField(max_length=255, verbose_name='Модель автомобиля')
     car_year = models.IntegerField(verbose_name='Год автомобиля')
@@ -27,6 +30,20 @@ class ClientCar(models.Model):
     loan_guid = models.UUIDField(null=True, blank=True, unique=True, verbose_name='GUID кредита из 1С')
     paid_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Погашено')
     remaining_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток к погашению')
+    advance_payment_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Авансовый платёж')
+    disbursement_date = models.DateField(null=True, blank=True, verbose_name='Дата выдачи лизинга')
+    last_payment_date = models.DateField(null=True, blank=True, verbose_name='Дата последнего платежа')
+    term = models.PositiveIntegerField(null=True, blank=True, verbose_name='Срок (в месяцах)')
+
+    due_days_principal = models.PositiveIntegerField(null=True, blank=True, verbose_name='Дней просрочки по основному долгу')
+    due_days_interest = models.PositiveIntegerField(null=True, blank=True, verbose_name='Дней просрочки по процентам')
+
+    due_amount_principal = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Просроченная сумма по основному долгу')
+    due_amount_interest = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Просроченная сумма по процентам')
+
+    principal_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по основному долгу')
+    interest_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по процентам')
+    и = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по пене')
 
     class Meta:
         verbose_name = 'Авто клиентов'

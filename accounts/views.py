@@ -6,7 +6,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from accounts.models import User
-from accounts.serializers import UserLoginSerializer, ExpoPushTokenSerializer
+from accounts.serializers import UserLoginSerializer, UserRegisterSerializer,ExpoPushTokenSerializer
+from core.models import Client
 
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
@@ -35,6 +36,56 @@ class UserLoginView(generics.GenericAPIView):
         else:
             return Response({"error": "Invalid phone or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
+
+class UserRegisterView(generics.GenericAPIView):
+    serializer_class = UserRegisterSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        phone = serializer.validated_data['phone']
+        password = serializer.validated_data['password']
+        password2 = serializer.validated_data.get('password2')
+
+        if password2 and password != password2:
+            return Response(
+                {"error": "Пароли не совпадают"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        client = Client.objects.filter(phone=phone).first()
+        if not client:
+            return Response(
+                {"error": "Ваш номер не найден среди клиентов Унаа Лизинг\n"
+                          "Пожалуйста, попробуйте еще раз через 24 часа"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        user = User.objects.filter(phone=phone).first()
+        if not user:
+            user = User.objects.create(
+                phone=phone,
+                client=client,
+                is_active=True
+            )
+            user.set_password(password)
+            user.save()
+
+            refresh = RefreshToken.for_user(user)
+
+            return Response({
+                "id": user.id,
+                "phone": user.phone,
+                "client_id": client.id,
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"error": "Пользователь с таким номером уже существует"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class CustomTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]

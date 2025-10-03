@@ -25,6 +25,8 @@ from .serializers import (
     ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer, LeasingCalcInputSerializer, LeasingResultSerializer
 )
 from .calculations import calculate_leasing
+from django.utils.timezone import now
+from rest_framework.exceptions import ValidationError
 
 class ClientInfoListAPIView(ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -326,6 +328,11 @@ class ClientReportListView(ListAPIView):
 
                 report.append({
                     "client_fio": client.fio,
+                    "client_phone": client.phone,
+                    "client_email": client.email,
+                    "client_residence": client.residence,
+                    "client_registration_address": client.registration_address,
+
                     "car_number": car.car_number,
                     "car_name": car.car_name,
                     "car_model": car.car_model,
@@ -333,6 +340,13 @@ class ClientReportListView(ListAPIView):
                     "car_total_cost": car.total_amount,
                     "car_remaining_amount": car.remaining_amount,
                     "car_paid_amount": car.paid_amount,
+                    "car_due_days_principal": car.due_days_principal,
+                    "car_due_days_interest": car.due_days_interest,
+                    "car_due_amount_principal": car.due_amount_principal,
+                    "car_due_amount_interest": car.due_amount_interest,
+                    "car_principal_balance": car.principal_balance,
+                    "car_interest_balance": car.interest_balance,
+                    "car_penalty_balance": car.penalty_balance,
                     "OSAGO_start": osago.start_date if osago else None,
                     "KASKO_start": kasko.start_date if kasko else None,
                     "OSAGO_end": osago.end_date if osago else None,
@@ -409,3 +423,47 @@ class LeasingCalcAPIView(APIView):
             "result": result,
             "description": comment
         }, status=status.HTTP_200_OK)
+    
+    
+class WaybillAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id=None):
+        if not id:
+            raise ValidationError({"error": "Не передан id машины"})
+
+        try:
+            car = ClientCar.objects.get(id=id, client=request.user.client)
+        except ClientCar.DoesNotExist:
+            raise ValidationError({"error": "Машина не найдена или не принадлежит клиенту"})
+
+        today = now().date()
+
+        repayment = car.repayment_schedules.filter(
+            paid_date__month=today.month,
+            paid_date__year=today.year
+        ).first()
+
+        if not repayment:
+            raise ValidationError({"error": "Для этой машины не найден график платежей на этот месяц"})
+
+        if repayment.is_paid != "is_paid":
+            return Response({
+                "status": "unpaid",
+                "message": f"Необходимо оплатить до {repayment.paid_date}",
+                "next_payment_date": repayment.paid_date
+            }, status=402)
+
+        start_date = repayment.paid_date.replace(day=1)
+        next_month = repayment.paid_date.replace(day=28) + timedelta(days=4)
+        end_date = next_month.replace(day=1) - timedelta(days=1)
+
+        data = {
+            "fio": car.client.fio,
+            "car_name": car.car_name,
+            "car_number": car.car_number,
+            "waybill_valid_from": start_date,
+            "waybill_valid_to": end_date,
+            "status": "ok"
+        }
+        return Response(data)
