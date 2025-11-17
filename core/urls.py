@@ -3,7 +3,7 @@ from .views import (
     ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
     ContactClientCreateAPIView, LocationClientCreateAPIView, InsuranceClientListAPIView, LastThreeDaysMessagesView, 
     ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView,
-    ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView, LeasingCalcAPIView, WaybillAPIView
+    ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView, LeasingCalcAPIView, WaybillAPIView, AddExtraWaybillNameView, AppVersionRetrieveView
 )
 
 urlpatterns = [
@@ -28,5 +28,7 @@ urlpatterns = [
     path('api/admin/client-report/', ClientReportListView.as_view(), name='client-report-list'),
     path('api/admin/client-report/<int:id>/', ClientReportOneView.as_view(), name='client-report-one'),
     path('api/waybill/<int:id>/', WaybillAPIView.as_view(), name='waybill'),
+    path('api/waybill/extra/<int:pk>/', AddExtraWaybillNameView.as_view()),
+    path("api/app-version/", AppVersionRetrieveView.as_view(), name="app-version"),
     
 ]

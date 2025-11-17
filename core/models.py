@@ -212,3 +212,34 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.user.phone
+
+
+class WaybillExtraName(models.Model):
+    client_car = models.ForeignKey(
+        'ClientCar',
+        on_delete=models.CASCADE,
+        related_name='extra_waybill_names',
+        verbose_name='Авто клиента'
+    )
+    fio = models.CharField(max_length=255, verbose_name='Доп. ФИО для путевого листа')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Дополнительное имя для путевого листа'
+        verbose_name_plural = 'Дополнительные имена для путевых листов'
+
+    def __str__(self):
+        return f"{self.fio} ({self.client_car.car_name})"
+
+
+class AppVersion(models.Model):
+    version = models.CharField(max_length=20, verbose_name="Версия приложения")
+
+    class Meta:
+        verbose_name = "Версия приложения"
+        verbose_name_plural = "Версии приложения"
+
+    def __str__(self):
+        return self.version

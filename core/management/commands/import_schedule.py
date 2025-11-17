@@ -1,73 +1,88 @@
+import pandas as pd
 from django.core.management.base import BaseCommand
-from decimal import Decimal
+from django.utils.dateparse import parse_date
 from datetime import datetime
-from core.models import RepaymentSchedule, ClientCar  # замени leasing на своё приложение
+
+from core.models import ClientCar, InsuranceClient
+
 
 class Command(BaseCommand):
-    help = 'Импорт графика лизинга из таблицы вручную'
+    help = "Импорт ОСАГО из Excel и привязка по номеру автомобиля"
 
-    def handle(self, *args, **kwargs):
-        client_car_id = 2  # замени на нужный ID клиента
-        client_car = ClientCar.objects.get(id=client_car_id)
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--file',
+            type=str,
+            required=True,
+            help='Путь к Excel файлу со страховками'
+        )
 
-        data = [
-    # ('дата', 'сумма лизинга', 'погашение основного', 'погашение начисл.', 'итог к погашению')
-    ('14.04.2025', '1,033,831.32', '15,747', '28,431', '44,178'),
-    ('12.05.2025', '1,018,084.32', '20,422', '23,756', '44,178'),
-    ('12.06.2025', '997,662.32', '20,642', '23,536', '44,178'),
-    ('12.07.2025', '979,257.32', '18,064', '26,114', '44,178'),
-    ('12.08.2025', '961,193.32', '20,949', '23,229', '44,178'),
-    ('12.09.2025', '940,244.32', '20,888', '23,290', '44,178'),
-    ('13.10.2025', '920,356.32', '20,402', '23,776', '44,178'),
-    ('12.11.2025', '899,954.32', '20,402', '23,776', '44,178'),
-    ('12.12.2025', '878,275.32', '22,261', '21,917', '44,178'),
-    ('13.01.2026', '853,991.32', '24,284', '19,894', '44,178'),
-    ('12.02.2026', '828,991.32', '25,015', '19,163', '44,178'),
-    ('13.03.2026', '803,976.32', '25,615', '18,563', '44,178'),
-    ('13.04.2026', '786,112.32', '23,761', '20,417', '44,178'),
-    ('12.05.2026', '761,694.32', '24,513', '19,665', '44,178'),
-    ('12.06.2026', '737,156.32', '25,734', '18,444', '44,178'),
-    ('13.07.2026', '711,422.32', '25,784', '18,394', '44,178'),
-    ('12.08.2026', '685,638.32', '26,179', '17,999', '44,178'),
-    ('12.09.2026', '659,216.32', '20,049', '18,129', '44,178'),
-    ('12.10.2026', '639,167.32', '24,376', '19,802', '44,178'),
-    ('12.11.2026', '603,763.32', '28,284', '15,894', '44,178'),
-    ('12.12.2026', '577,669.32', '31,325', '12,853', '44,178'),
-    ('12.01.2027', '546,344.32', '30,974', '13,204', '44,178'),
-    ('12.02.2027', '515,370.32', '30,974', '13,204', '44,178'),
-    ('12.03.2027', '484,506.32', '32,761', '11,416', '44,178'),
-    ('12.04.2027', '451,745.32', '33,699', '10,479', '44,178'),
-    ('12.05.2027', '419,124.32', '33,699', '10,479', '44,178'),
-    ('12.06.2027', '386,524.32', '33,699', '10,479', '44,178'),
-    ('12.07.2027', '351,847.32', '35,668', '8,510', '44,178'),
-    ('12.08.2027', '316,179.32', '35,668', '8,510', '44,178'),
-    ('13.09.2027', '280,511.32', '35,668', '8,510', '44,178'),
-    ('12.10.2027', '244,843.32', '36,305', '7,873', '44,178'),
-    ('12.11.2027', '208,538.32', '38,711', '5,467', '44,178'),
-    ('13.12.2027', '165,960.32', '39,896', '4,282', '44,178'),
-    ('12.01.2028', '126,064.32', '39,896', '4,282', '44,178'),
-    ('13.02.2028', '85,044.32', '41,896', '2,339', '44,178'),
-    ('13.03.2028', '43,205.32', '43,205.32', '1,090', '44,214.32'),
-]
+    def handle(self, *args, **options):
+        file_path = options['file']
 
-        for row in data:
-            paid_date = datetime.strptime(row[0], "%d.%m.%Y").date()
-            total_amount = Decimal(row[1].replace(',', '').replace(' ', ''))
-            main_debt = Decimal(row[2].replace(',', '').replace(' ', ''))
-            interest = Decimal(row[3].replace(',', '').replace(' ', ''))
-            total_payment = Decimal(row[4].replace(',', '').replace(' ', ''))
+        try:
+            df = pd.read_excel(file_path)
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Ошибка чтения файла: {e}"))
+            return
 
-            RepaymentSchedule.objects.create(
-                car_client=client_car,
-                paid_date=paid_date,
-                total_amount=total_amount,
-                main_debt=main_debt,
-                interest=interest,
-                total_payment=total_payment,
-                paid_amount=None,
-                remaining_amount=total_payment,
-                overdue_amount=None,
-                is_paid=False
+        COL_POLICY = "№ Полиса или договора перестрахования"
+        COL_START = "Дата начала договора"
+        COL_END = "Дата окончания"
+        COL_CAR_NUMBER = "Госномер"
+
+        required_columns = [COL_POLICY, COL_START, COL_END, COL_CAR_NUMBER]
+        for col in required_columns:
+            if col not in df.columns:
+                self.stdout.write(self.style.ERROR(f"В Excel нет колонки: {col}"))
+                return
+
+        def parse_date_custom(v):
+            """Парсер дат формата DD-MM-YYYY"""
+            if not v or str(v).lower() == "nan":
+                return None
+            try:
+                return datetime.strptime(str(v), "%d-%m-%Y").date()
+            except:
+                return None
+
+        created_count = 0
+        skipped_no_car = 0
+        skipped_no_dates = 0
+
+        for _, row in df.iterrows():
+
+            car_number = str(row[COL_CAR_NUMBER]).strip().upper()
+
+            if not car_number:
+                skipped_no_car += 1
+                continue
+
+            car = ClientCar.objects.filter(car_number__iexact=car_number).first()
+
+            if not car:
+                skipped_no_car += 1
+                continue
+
+            start_date = parse_date_custom(row[COL_START])
+            end_date = parse_date_custom(row[COL_END])
+
+            if not start_date or not end_date:
+                skipped_no_dates += 1
+                continue
+
+            InsuranceClient.objects.create(
+                client=car,
+                insurance_company="OSAGO",
+                policy_number=str(row[COL_POLICY]).strip(),
+                start_date=start_date,
+                end_date=end_date,
             )
 
-        self.stdout.write(self.style.SUCCESS("✅ График успешно импортирован."))
+            created_count += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Готово! Добавлено страховок: {created_count}, "
+            f"пропущено из-за отсутствия машины: {skipped_no_car}, "
+            f"пропущено из-за некорректной даты: {skipped_no_dates}"
+        ))

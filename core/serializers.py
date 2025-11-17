@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import  (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, \
+    Send_Message, Notification, WaybillExtraName, AppVersion
 )
 
 class ClientSerializers(serializers.ModelSerializer):
@@ -94,6 +95,9 @@ class ContactClientSerializers(serializers.ModelSerializer):
     class Meta:
         model = ContactClient
         fields = ['id', 'name', 'phone']
+        extra_kwargs = {
+            "phone": {"validators": []},  # отключаем UniqueValidator
+        }
 
 class ContactClientBulkCreateSerializer(serializers.Serializer):
     contacts = ContactClientSerializers(many=True)
@@ -157,3 +161,14 @@ class LeasingResultSerializer(serializers.Serializer):
     monthly_payment = serializers.DecimalField(max_digits=12, decimal_places=2)
     initial_payment_total = serializers.DecimalField(max_digits=12, decimal_places=2)
     details = serializers.DictField(child=serializers.DecimalField(max_digits=12, decimal_places=2))
+
+class WaybillExtraNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WaybillExtraName
+        fields = ['id', 'fio', 'created_at']
+
+
+class AppVersionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppVersion
+        fields = ["version"]

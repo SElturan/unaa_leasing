@@ -5,6 +5,8 @@ from datetime import date, timedelta
 from .expo_push import send_push_message
 from django.db.models import Q
 from accounts.models import User
+from core.fetch_1c_data import import_clients_from_1c
+
 
 # @shared_task
 # def fetch_clients_task():
@@ -14,7 +16,6 @@ from accounts.models import User
 @shared_task
 def send_notification_task():
     today = date.today()
-    print('-123123')
 
     # --- ПЛАТЕЖИ ---
     soon_range = [today, today + timedelta(days=3)]
@@ -116,3 +117,11 @@ def send_notification_task():
             )   
 
     return "Notification task completed successfully."
+
+
+
+@shared_task
+def import_clients_daily():
+    print('1231231313')
+    import_clients_from_1c()
+    return "Импорт из 1С завершён"

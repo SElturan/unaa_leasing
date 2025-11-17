@@ -17,12 +17,14 @@ from drf_spectacular.utils import extend_schema
 
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, Send_Message, LocationClient, Notification
+    AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, \
+    Send_Message, LocationClient, Notification, WaybillExtraName, AppVersion
 )
 
 from .serializers import (
     ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, 
-    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer, LeasingCalcInputSerializer, LeasingResultSerializer
+    ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer, \
+    LeasingCalcInputSerializer, LeasingResultSerializer, WaybillExtraNameSerializer, AppVersionSerializer
 )
 from .calculations import calculate_leasing
 from django.utils.timezone import now
@@ -195,30 +197,39 @@ class ContactClientCreateAPIView(CreateAPIView):
         if not isinstance(raw_data, list):
             return Response({"error": "Ожидается список контактов"}, status=status.HTTP_400_BAD_REQUEST)
 
-        phones = [item.get("phone") for item in raw_data if "phone" in item]
-        existing_phones = set(
-            ContactClient.objects.filter(phone__in=phones).values_list("phone", flat=True)
-        )
-
-        new_data = [item for item in raw_data if item.get("phone") not in existing_phones]
-        skipped_data = [item for item in raw_data if item.get("phone") in existing_phones]
-
-        serializer = self.get_serializer(data=new_data, many=True)
+        serializer = self.get_serializer(data=raw_data, many=True)
         serializer.is_valid(raise_exception=True)
 
         client = request.user.client
-        contacts = [
-            ContactClient(client=client, **contact)
-            for contact in serializer.validated_data
-        ]
-        ContactClient.objects.bulk_create(contacts)
+
+        # телефоны из запроса
+        phones = [item["phone"] for item in serializer.validated_data]
+
+        # телефоны, которые уже есть в базе
+        existing_phones = set(
+            ContactClient.objects.filter(client=client, phone__in=phones)
+            .values_list("phone", flat=True)
+        )
+
+        # убираем дубликаты внутри одного запроса
+        unique_data = {item["phone"]: item for item in serializer.validated_data}.values()
+
+        # фильтруем только новые
+        new_contacts = [item for item in unique_data if item["phone"] not in existing_phones]
+
+        # создаём новые
+        ContactClient.objects.bulk_create(
+            [ContactClient(client=client, **data) for data in new_contacts],
+            ignore_conflicts=True
+        )
 
         return Response({
             "status": "created",
-            "added": len(contacts),
-            "skipped": len(skipped_data),
-            "skipped_contacts": skipped_data,
+            "added": len(new_contacts),
+            "skipped": len(phones) - len(new_contacts),
+            "skipped_phones": list(existing_phones),
         }, status=status.HTTP_201_CREATED)
+
     
 class ContactClientListIDAPIView(ListAPIView):
     serializer_class = ContactClientSerializers
@@ -290,7 +301,7 @@ class InsuranceClientListByClientIdAPIView(ListAPIView):
     lookup_field = 'client_id'
 
     def get_queryset(self):
-        return InsuranceClient.objects.filter(client__client_id=self.kwargs['client_id'])
+        return InsuranceClient.objects.filter(client_id=self.kwargs['client_id'])
     
 class LastThreeDaysMessagesView(ListAPIView):
     serializer_class = SendMessageSerializer
@@ -439,31 +450,97 @@ class WaybillAPIView(APIView):
 
         today = now().date()
 
-        repayment = car.repayment_schedules.filter(
-            paid_date__month=today.month,
-            paid_date__year=today.year
-        ).first()
+        # Получаем платежи по дате
+        payments = car.repayment_schedules.order_by("paid_date")
+        next_payment = None
+        previous_payment = None
 
-        if not repayment:
-            raise ValidationError({"error": "Для этой машины не найден график платежей на этот месяц"})
+        for payment in payments:
+            if payment.paid_date >= today:
+                next_payment = payment
+                break
+            previous_payment = payment
 
-        if repayment.is_paid != "is_paid":
+        if not next_payment:
+            raise ValidationError({"error": "Следующий платеж не найден, путевой лист недоступен"})
+
+        # Проверяем, что предыдущий платеж был оплачен
+        if previous_payment and previous_payment.is_paid != "is_paid":
             return Response({
                 "status": "unpaid",
-                "message": f"Необходимо оплатить до {repayment.paid_date}",
-                "next_payment_date": repayment.paid_date
+                "message": f"Необходимо оплатить до {previous_payment.paid_date}",
+                "next_payment_date": previous_payment.paid_date
             }, status=402)
 
-        start_date = repayment.paid_date.replace(day=1)
-        next_month = repayment.paid_date.replace(day=28) + timedelta(days=4)
-        end_date = next_month.replace(day=1) - timedelta(days=1)
+        # Определяем период действия путевого листа
+        start_date = previous_payment.paid_date if previous_payment else today
+        end_date = next_payment.paid_date  # включительно
+
+        extra_names = car.extra_waybill_names.all()
+
+        # Формируем строку ФИО для путевого листа
+        if extra_names.exists():
+            fio_for_waybill = f"{car.client.fio}\n" + "\n".join([e.fio for e in extra_names])
+        else:
+            fio_for_waybill = car.client.fio
 
         data = {
-            "fio": car.client.fio,
-            "car_name": car.car_name,
+            "fio": fio_for_waybill,
+            "car_name": car.car_model,
             "car_number": car.car_number,
             "waybill_valid_from": start_date,
             "waybill_valid_to": end_date,
             "status": "ok"
         }
         return Response(data)
+
+class AddExtraWaybillNameView(RetrieveAPIView):
+    queryset = ClientCar.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = WaybillExtraNameSerializer  # формально не используется для POST
+
+    def post(self, request, *args, **kwargs):
+        client_car = self.get_object()  # Берём машину по URL /<id>/
+        
+
+        if client_car.client != request.user.client:
+            return Response({"error": "Вы не можете добавлять имена к чужому авто."},
+                    status=status.HTTP_403_FORBIDDEN)
+
+
+        fio = request.data.get("fio")
+
+        if not fio:
+            return Response(
+                {"error": "Поле 'fio' обязательно."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Лимит 2
+        if client_car.extra_waybill_names.count() >= 2:
+            return Response(
+                {"error": "Можно добавить максимум 2 дополнительных имени."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Создаём запись
+        extra = WaybillExtraName.objects.create(
+            client_car=client_car,
+            fio=fio
+        )
+
+        return Response(
+            WaybillExtraNameSerializer(extra).data,
+            status=status.HTTP_201_CREATED
+        )
+
+class AppVersionRetrieveView(generics.RetrieveAPIView):
+    """
+    GET /api/app-version/ → возвращает текущую версию приложения
+    """
+    queryset = AppVersion.objects.all()
+    serializer_class = AppVersionSerializer
+
+    def get_object(self):
+        # Берём последнюю добавленную версию
+        return self.queryset.latest("id")

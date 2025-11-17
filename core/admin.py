@@ -1,7 +1,9 @@
 from django.contrib import admin
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
-    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification
+    ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification,
+    WaybillExtraName, AppVersion
+
 )
 
 
@@ -111,3 +113,13 @@ class NotificationAdmin(admin.ModelAdmin):
     ordering = ['created_at']
 
 admin.site.register(Notification, NotificationAdmin)
+
+class WaybillExtraNameAdmin(admin.ModelAdmin):
+    list_display = ['client_car', 'fio']
+
+admin.site.register(WaybillExtraName, WaybillExtraNameAdmin)
+
+class AppVersionAdmin(admin.ModelAdmin):
+    list_display = ['version']
+
+admin.site.register(AppVersion, AppVersionAdmin)
