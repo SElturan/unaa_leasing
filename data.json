@@ -700,24 +700,7 @@
     "phone": "string"
   }
 },
-{
-  "model": "core.contactclient",
-  "pk": 2,
-  "fields": {
-    "client": 2,
-    "name": "Алексей",
-    "phone": "+996555123456"
-  }
-},
-{
-  "model": "core.contactclient",
-  "pk": 3,
-  "fields": {
-    "client": 2,
-    "name": "Ирина",
-    "phone": "+996777654321"
-  }
-},
+
 {
   "model": "core.contactclient",
   "pk": 4,

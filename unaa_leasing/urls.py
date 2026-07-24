@@ -13,6 +13,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('accounts.urls')),
     path('api/', include('core.urls')),
+    path('pay/', include('payments.urls')),
     path('i18n/', set_language, name='set_language'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # Optional UI:

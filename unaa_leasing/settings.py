@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     # apps
     'core.apps.CoreConfig',
     'accounts.apps.AccountsConfig',
+    'payments.apps.PaymentsConfig',
+
 ]
 
 MIDDLEWARE = [
@@ -165,12 +167,15 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:8000',
     'http://0:0:0:0:8000',
     'http://172.18.0.1:8001',
+    
+]
+CORS_ALLOWED_ORIGINS = [
+    "https://unaa-leasing-admin.su",
+    "https://www.unaa-leasing-admin.su",
 ]
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',
-    'http://0:0:0:0:8000',
-    'https://unaa-leasing-admin.su/',
-    'http://192.168.159.219/',
+    "https://unaa-leasing-admin.su",
+    "https://www.unaa-leasing-admin.su",
 ]
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'  # или другой брокер сообщений
@@ -197,6 +202,10 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+BEPAY_BASE_URL = ('https://api.bepay.kg')
+BEPAY_MERCHANT_ID = ('574fbabf-8c47-4567-9be8-896921cfb7ef')
+BEPAY_SECRET_KEY = ('f1df303f-d9b3-495e-8fed-5d544a3bb211')
 
 JAZZMIN_SETTINGS = {
     "site_title": "unaa_leasing",

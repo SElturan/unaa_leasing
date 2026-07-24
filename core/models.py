@@ -43,7 +43,7 @@ class ClientCar(models.Model):
 
     principal_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по основному долгу')
     interest_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по процентам')
-    и = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по пене')
+    penalty_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по пене')
 
     class Meta:
         verbose_name = 'Авто клиентов'
@@ -238,8 +238,20 @@ class AppVersion(models.Model):
     version = models.CharField(max_length=20, verbose_name="Версия приложения")
 
     class Meta:
-        verbose_name = "Версия приложения"
-        verbose_name_plural = "Версии приложения"
+        verbose_name = "Версия для apple"
+        verbose_name_plural = "Версии apple"
 
     def __str__(self):
         return self.version
+
+class AppAndroidVersion(models.Model):
+    version = models.CharField(max_length=20, verbose_name="Версия приложения")
+
+    class Meta:
+        verbose_name = "Версия для android"
+        verbose_name_plural = "Версии android"
+
+    def __str__(self):
+        return self.version
+
+

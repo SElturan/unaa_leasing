@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 
 COPY requirements.txt /app/
+RUN pip install --upgrade pip setuptools
 RUN python -m pip install --upgrade pip
 
 # Добавьте 'apt-get update' перед установкой пакетов

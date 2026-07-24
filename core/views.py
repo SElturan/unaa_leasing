@@ -18,13 +18,13 @@ from drf_spectacular.utils import extend_schema
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
     AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, ContactClient, \
-    Send_Message, LocationClient, Notification, WaybillExtraName, AppVersion
+    Send_Message, LocationClient, Notification, WaybillExtraName, AppVersion, AppAndroidVersion
 )
 
 from .serializers import (
     ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers, RepaymentDetailScheduleSerializer, InsuranceClientSerializers, AdCarsSerializers, AdCarsDetailSerializers, 
     ContactClientSerializers, LocationClientSerializers, SendMessageSerializer, LocationClientDetailSerializers, NotificationSerializer, \
-    LeasingCalcInputSerializer, LeasingResultSerializer, WaybillExtraNameSerializer, AppVersionSerializer
+    LeasingCalcInputSerializer, LeasingResultSerializer, WaybillExtraNameSerializer, AppVersionSerializer, AppAndroidVersionSerializer
 )
 from .calculations import calculate_leasing
 from django.utils.timezone import now
@@ -107,16 +107,16 @@ class CarPaymentInfoRetrieveView(RetrieveAPIView):
                 "main_debt": float(rep.main_debt),
                 "interest": float(rep.interest),
                 "total_payment": float(rep.total_payment),
-                "remaining_after": float(remaining - rep.total_payment) if not rep.is_paid else float(remaining),
+                "remaining_after": float(remaining - rep.total_payment) if rep.is_paid != 'is_paid' else float(remaining),
                 "is_paid": rep.is_paid,
                 "is_next": rep.id == next_payment_id
             }
-            if not rep.is_paid and rep.paid_date <= today:
+            if rep.is_paid != 'is_paid' and rep.paid_date <= today:
                 item["overdue"] = True
 
             repayment_list.append(item)
 
-            if not rep.is_paid:
+            if rep.is_paid != 'is_paid':
                 remaining -= rep.total_payment  # всё в Decimal
 
         # Краткая информация
@@ -132,6 +132,66 @@ class CarPaymentInfoRetrieveView(RetrieveAPIView):
             "short_info": short_info,
             "repayment_schedule": repayment_list
         }, status=status.HTTP_200_OK)
+
+class HomeNextPaymentAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Ближайший/просроченный платёж по каждой машине клиента",
+        description="Для каждой машины клиента отдельно возвращает: просрочку (если есть) "
+                    "или ближайший ещё не оплаченный платёж, без ограничения по сроку.",
+        tags=["Главный экран"]
+    )
+    def get(self, request, *args, **kwargs):
+        client = getattr(request.user, "client", None)
+        if not client:
+            return Response({"detail": "У пользователя нет привязанного клиента"}, status=404)
+
+        today = date.today()
+        cars = ClientCar.objects.filter(client=client).order_by("id")
+
+        results = []
+        for car in cars:
+            payment_data = self._get_payment_for_car(car, today)
+            if payment_data:
+                results.append(payment_data)
+
+        return Response(results)
+
+    def _get_payment_for_car(self, car, today):
+        base_qs = RepaymentSchedule.objects.filter(
+            car_client=car
+        ).exclude(is_paid="is_paid")
+
+        # просрочка — самая свежая (ближайшая к сегодня)
+        overdue = base_qs.filter(paid_date__lt=today).order_by("-paid_date").first()
+        if overdue:
+            return self._build_payload(car, overdue, today, is_overdue=True)
+
+        # иначе — ближайший будущий платёж, без ограничения по дням
+        upcoming = base_qs.filter(paid_date__gte=today).order_by("paid_date").first()
+        if upcoming:
+            return self._build_payload(car, upcoming, today, is_overdue=False)
+
+        return None  # у этой машины вообще нет неоплаченных платежей
+
+    def _build_payload(self, car, payment, today, is_overdue):
+        data = {
+            "type": "overdue" if is_overdue else "upcoming",
+            "paid_date": payment.paid_date,
+            "amount": float(payment.total_payment),
+            "car": {
+                "id": car.id,
+                "car_name": car.car_name,
+                "car_model": car.car_model,
+                "car_number": car.car_number,
+            },
+        }
+        if is_overdue:
+            data["days_overdue"] = (today - payment.paid_date).days
+        else:
+            data["days_left"] = (payment.paid_date - today).days
+        return data
 
     
 class AdCarsListAPIView(ListAPIView):
@@ -540,6 +600,18 @@ class AppVersionRetrieveView(generics.RetrieveAPIView):
     """
     queryset = AppVersion.objects.all()
     serializer_class = AppVersionSerializer
+
+    def get_object(self):
+        # Берём последнюю добавленную версию
+        return self.queryset.latest("id")
+
+
+class AppAndroidVersionRetrieveView(generics.RetrieveAPIView):
+    """
+    GET /api/app-version/ → возвращает текущую версию приложения
+    """
+    queryset = AppAndroidVersion.objects.all()
+    serializer_class = AppAndroidVersionSerializer
 
     def get_object(self):
         # Берём последнюю добавленную версию

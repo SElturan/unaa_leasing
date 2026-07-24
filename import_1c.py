@@ -10,8 +10,8 @@ PASSWORD = "vLFuwAFk"
 def import_clients_from_1c():
     headers = {"Content-Type": "application/json"}
     payload = {
-        "beginDate": "20200101",
-        "endDate": "20251104",
+        "beginDate": "20230101",
+        "endDate": "20260712",
         "customerGuid": None,
         "customerName": None
     }

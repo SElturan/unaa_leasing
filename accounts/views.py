@@ -30,6 +30,7 @@ class UserLoginView(generics.GenericAPIView):
                 'id': user.id,
                 'phone': user.phone,
                 'role': user.is_staff,
+                'is_active': user.is_active,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token)
             }, status=status.HTTP_200_OK)
@@ -78,6 +79,7 @@ class UserRegisterView(generics.GenericAPIView):
                 "id": user.id,
                 "phone": user.phone,
                 "client_id": client.id,
+                "is_active": user.is_active,
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
             }, status=status.HTTP_200_OK)
@@ -122,3 +124,15 @@ class ExpoPushTokenView(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class DeleteAccountView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        request.user.is_active = False
+        request.user.save(update_fields=["is_active",])
+
+        return Response(
+            {"message": "Аккаунт успешно удален"},
+            status=status.HTTP_200_OK,
+        )

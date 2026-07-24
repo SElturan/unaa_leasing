@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     Client, RepaymentSchedule, InsuranceClient,
     ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification,
-    WaybillExtraName, AppVersion
+    WaybillExtraName, AppVersion, AppAndroidVersion, 
 
 )
 
@@ -123,3 +123,8 @@ class AppVersionAdmin(admin.ModelAdmin):
     list_display = ['version']
 
 admin.site.register(AppVersion, AppVersionAdmin)
+
+class AppAndroidVersionAdmin(admin.ModelAdmin):
+    list_display = ['version']
+
+admin.site.register(AppAndroidVersion, AppAndroidVersionAdmin)

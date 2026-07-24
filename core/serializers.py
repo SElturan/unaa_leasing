@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import  (
     Client, RepaymentSchedule, InsuranceClient,
     ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, \
-    Send_Message, Notification, WaybillExtraName, AppVersion
+    Send_Message, Notification, WaybillExtraName, AppVersion, AppAndroidVersion
 )
 
 class ClientSerializers(serializers.ModelSerializer):
@@ -172,3 +172,9 @@ class AppVersionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppVersion
         fields = ["version"]
+
+class AppAndroidVersionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppAndroidVersion
+        fields = ["version"]
+

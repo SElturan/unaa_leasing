@@ -1,15 +1,17 @@
 from django.urls import path
 from .views import (
-    ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
+    ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, \
+    HomeNextPaymentAPIView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
     ContactClientCreateAPIView, LocationClientCreateAPIView, InsuranceClientListAPIView, LastThreeDaysMessagesView, 
     ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView,
-    ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView, LeasingCalcAPIView, WaybillAPIView, AddExtraWaybillNameView, AppVersionRetrieveView
+    ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView, LeasingCalcAPIView, WaybillAPIView, AddExtraWaybillNameView, AppVersionRetrieveView, AppAndroidVersionRetrieveView
 )
 
 urlpatterns = [
     path('api/client-info', ClientInfoListAPIView.as_view(), name='client-info'),
     path('api/client-cars-detail/<int:id>/', ClientCarDetailAPIView.as_view(), name='client-car-detail'),
     path('api/repayment-schedule/<int:id>/', CarPaymentInfoRetrieveView.as_view(), name='repayment-schedule'),
+    path('api/home-next-payment/', HomeNextPaymentAPIView.as_view(), name='home-next-payment'),
     path('api/ad-cars', AdCarsListAPIView.as_view(), name='ad-cars'),
     path('api/ad-cars-detail/<int:id>/', AdCarsRetrieveAPIView.as_view(), name='ad-car-detail'),
     path('api/cars-credit-calc/', CreditCalculatorListAPIView.as_view()),
@@ -30,5 +32,6 @@ urlpatterns = [
     path('api/waybill/<int:id>/', WaybillAPIView.as_view(), name='waybill'),
     path('api/waybill/extra/<int:pk>/', AddExtraWaybillNameView.as_view()),
     path("api/app-version/", AppVersionRetrieveView.as_view(), name="app-version"),
+    path("api/app-android-version/", AppAndroidVersionRetrieveView.as_view(), name="app-android-version"),
     
 ]
