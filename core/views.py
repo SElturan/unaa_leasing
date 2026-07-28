@@ -793,16 +793,15 @@ class WaybillAPIView(APIView):
         }, status=402)
 
     def _issue_waybill(self, car, start_date, end_date, extra=None):
-        """Собирает тело путевого листа: ФИО (+ доп. имена), машина, период действия."""
-        extra_names = car.extra_waybill_names.all()
-
-        if extra_names.exists():
-            fio_for_waybill = f"{car.client.fio}\n" + "\n".join([e.fio for e in extra_names])
-        else:
-            fio_for_waybill = car.client.fio
+        """Собирает тело путевого листа: владелец, доп. водители (с id), машина, период."""
+        extra_names = car.extra_waybill_names.all().order_by("id")
 
         data = {
-            "fio": fio_for_waybill,
+            "owner_fio": car.client.fio,
+            "drivers": [
+                {"id": e.id, "fio": e.fio}
+                for e in extra_names
+            ],
             "car_name": car.car_model,
             "car_number": car.car_number,
             "waybill_valid_from": start_date,
