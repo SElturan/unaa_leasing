@@ -85,6 +85,7 @@ class RepaymentSchedule(models.Model):
     paid_date = models.DateField(null=True, blank=True, verbose_name='Дата погашения')
     overdue_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Просрочки')
     is_paid = models.CharField( choices=IS_PAID_CHOICES, verbose_name='Оплата',)
+    last_reminder_sent = models.DateField(null=True, blank=True, verbose_name='Дата последнего напоминания')
 
     class Meta:
         verbose_name = 'График погашения'
@@ -105,6 +106,7 @@ class InsuranceClient(models.Model):
     policy_number = models.CharField(max_length=50, verbose_name='Номер полиса')
     start_date = models.DateField(verbose_name='Дата начала')
     end_date = models.DateField(verbose_name='Дата окончания')
+    last_reminder_sent = models.DateField(null=True, blank=True, verbose_name='Дата последнего напоминания')
 
     class Meta:
         verbose_name = 'Страхование клиента'

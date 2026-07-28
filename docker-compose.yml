@@ -1,3 +1,4 @@
+# /home/unaa_leasing/docker-compose.yml
 services:
   db:
     image: postgres:15
@@ -14,41 +15,37 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   app:
-    build: . 
-    restart: always
-    command: bash -c "python manage.py collectstatic --no-input && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-    ports:
-      - "8000:8000"
+    image: unaa_leasing:${IMAGE_TAG:-latest}
+    build: .
+    command: gunicorn unaa_leasing.wsgi:application --bind 0.0.0.0:8000 --workers 3
     env_file:
       - .env
     depends_on:
-      - db 
+      - db
+    ports:
+      - "8000:8000"          # хостовый nginx будет ходить сюда
     volumes:
-      - .:/app
+      - ./static:/app/staticfiles
+      - ./media:/app/media
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
 
   redis:
     image: "redis:alpine"
-
     volumes:
       - redis-data:/data
     restart: always
 
-  channels:
-    build: .
-    command: bash -c "daphne unaa_leasing.asgi:application -b 0.0.0.0 -p 8001"
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      - redis
-      - app
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/app
-  
   celery:
     build: .
+    image: unaa_leasing:${IMAGE_TAG:-latest}
     command: bash -c "celery -A unaa_leasing worker --loglevel=info"
     restart: always
     env_file:
@@ -56,10 +53,10 @@ services:
     depends_on:
       - app
       - redis
-    volumes:
-      - .:/app
+
   celery-beat:
     build: .
+    image: unaa_leasing:${IMAGE_TAG:-latest}
     command: celery -A unaa_leasing beat --loglevel=info
     restart: always
     env_file:
@@ -67,8 +64,6 @@ services:
     depends_on:
       - app
       - redis
-    volumes:
-      - .:/app
 
 volumes:
   pgdata:

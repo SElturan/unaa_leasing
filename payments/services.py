@@ -87,7 +87,11 @@ class BePayClient:
 
 
         if expires_at:
-            payload["expires_at"] = expires_at.isoformat()
+            # принимаем и datetime, и уже готовую строку
+            if hasattr(expires_at, "strftime"):
+                payload["expires_at"] = expires_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                payload["expires_at"] = expires_at
 
 
         print("BEPAY REQUEST:", payload)

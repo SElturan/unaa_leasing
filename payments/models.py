@@ -33,6 +33,14 @@ class Payment(models.Model):
     qr_code_url = models.URLField(blank=True)
     providers = models.JSONField(default=list, blank=True)
 
+    repayment_schedule = models.ForeignKey(
+        'core.RepaymentSchedule',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='bepay_payments',
+        verbose_name='Платёж из графика'
+    )
+
     expires_at = models.DateTimeField(null=True, blank=True)
     executed_at = models.DateTimeField(null=True, blank=True)
 
