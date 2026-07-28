@@ -41,11 +41,14 @@ class CreateRepaymentPaymentView(APIView):
         amount_som = repayment.total_payment
         amount_tyiyn = int((amount_som * 100).to_integral_value())  # 15400.00 сом → 1540000 тыйын
 
+        expires_at = timezone.now() + timedelta(minutes=2)
+
         payment = Payment.objects.create(
             description=f"Платёж по графику #{repayment.id}",
             amount=amount_tyiyn,
             repayment_schedule=repayment,
-        )
+            expires_at=expires_at,
+)
 
         expires_at = (timezone.now() + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
 

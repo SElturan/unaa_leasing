@@ -242,6 +242,7 @@ class HomeNextPaymentAPIView(APIView):
     def _build_payload(self, car, payment, today, is_overdue):
         """Собирает один элемент ответа: сумма, дата, машина + days_left/days_overdue."""
         data = {
+            "id": payment.id,
             "type": "overdue" if is_overdue else "upcoming",
             "paid_date": payment.paid_date,
             "amount": float(payment.total_payment),
