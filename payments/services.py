@@ -71,37 +71,25 @@ class BePayClient:
 
 
 
-    def generate_qr(
-            self,
-            description,
-            amount,
-            expires_at=None,
-            user_guid=None
-    ):
+    def generate_qr(self, description, amount, expires_at=None, user_guid=None):
+            payload = {
+                "description": description,
+                "amount": int(amount),
+            }
+            if user_guid:
+                payload["user_guid"] = str(user_guid)
 
-        payload = {
-            "description": description,
-            "amount": int(amount),
-            "user_guid": str(user_guid),
-        }
+            if expires_at:
+                if hasattr(expires_at, "strftime"):
+                    from django.utils import timezone as dj_tz
+                    # переводим в местное время (Asia/Bishkek) перед отправкой
+                    local = dj_tz.localtime(expires_at)
+                    payload["expires_at"] = local.strftime("%Y-%m-%dT%H:%M:%S")
+                else:
+                    payload["expires_at"] = expires_at
 
-
-        if expires_at:
-            # принимаем и datetime, и уже готовую строку
-            if hasattr(expires_at, "strftime"):
-                payload["expires_at"] = expires_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-            else:
-                payload["expires_at"] = expires_at
-
-
-        print("BEPAY REQUEST:", payload)
-
-
-        return self._request(
-            "POST",
-            "/qr/generate",
-            json=payload
-        )
+            print("BEPAY REQUEST:", payload)
+            return self._request("POST", "/qr/generate", json=payload)
 
     def get_status(self, qr_transaction_id):
 
