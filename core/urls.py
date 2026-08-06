@@ -2,10 +2,16 @@ from django.urls import path
 from .views import (
     ClientInfoListAPIView, ClientCarDetailAPIView, CarPaymentInfoRetrieveView, \
     HomeNextPaymentAPIView, AdCarsListAPIView, AdCarsRetrieveAPIView,CreditCalculatorListAPIView,
-    ContactClientCreateAPIView, LocationClientCreateAPIView, InsuranceClientListAPIView, LastThreeDaysMessagesView, 
-    ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView, InsuranceClientListByClientIdAPIView,
+    ContactClientCreateAPIView, LocationClientCreateAPIView, LastThreeDaysMessagesView, 
+    ContactClientListIDAPIView, ClientInfoRetrieveAPIView, LocationClientRetrieveAPIView, LocationClientListAPIView,
     ClientAllListAPIView, ClientReportListView, ClientReportOneView, NotificationListView, LeasingCalcAPIView, WaybillAPIView, AddExtraWaybillNameView, \
-    DeleteExtraWaybillNameView, AppVersionRetrieveView, AppAndroidVersionRetrieveView
+    DeleteExtraWaybillNameView, AppVersionRetrieveView, AppAndroidVersionRetrieveView, OsagoListAPIView, OsagoListByClientIdAPIView
+)
+
+from .osago_views import (
+    OsagoReferencesView, OsagoReferenceView, OsagoPrefillView,
+    OsagoByCarView, OsagoCreateView, OsagoListView,
+    OsagoDetailView, OsagoStatusView,
 )
 
 urlpatterns = [
@@ -18,7 +24,7 @@ urlpatterns = [
     path('api/cars-credit-calc/', CreditCalculatorListAPIView.as_view()),
     path('api/contact-client-create/', ContactClientCreateAPIView.as_view(), name='contact-client'),
     path('api/location-client-create/', LocationClientCreateAPIView.as_view(), name='location-client'),
-    path('api/insurance-client-list/', InsuranceClientListAPIView.as_view(), name='insurance-client-list'),
+    path('api/insurance-client-list/', OsagoListAPIView.as_view(), name='insurance-client-list'),
     path('api/last-three-days-messages/', LastThreeDaysMessagesView.as_view(), name='last-three-days-messages'),
     path('api/notification-list/', NotificationListView.as_view(), name='notification-list'),
     path('api/leasing-calc/', LeasingCalcAPIView.as_view(), name='leasing-calc'),
@@ -26,7 +32,7 @@ urlpatterns = [
     path('api/admin/client-info/<int:id>/', ClientInfoRetrieveAPIView.as_view(), name='client-info-detail'),
     path('api/admin/location-client/', LocationClientListAPIView.as_view(), name='location-client-list'),
     path('api/admin/location-client/<int:id>/', LocationClientRetrieveAPIView.as_view(), name='location-client-detail'),
-    path('api/admin/insurance-client/<int:client_id>/', InsuranceClientListByClientIdAPIView.as_view(), name='insurance-client-list-by-client-id'),
+    path('api/admin/insurance-client/<int:client_id>/', OsagoListByClientIdAPIView.as_view(), name='insurance-client-list-by-client-id'),
     path('api/admin/all-client-list/', ClientAllListAPIView.as_view(), name='all-client-list'),
     path('api/admin/client-report/', ClientReportListView.as_view(), name='client-report-list'),
     path('api/admin/client-report/<int:id>/', ClientReportOneView.as_view(), name='client-report-one'),
@@ -35,5 +41,14 @@ urlpatterns = [
     path('api/waybill/extra/<int:pk>/delete/', DeleteExtraWaybillNameView.as_view()),
     path("api/app-version/", AppVersionRetrieveView.as_view(), name="app-version"),
     path("api/app-android-version/", AppAndroidVersionRetrieveView.as_view(), name="app-android-version"),
+
+    path('api/osago/references/', OsagoReferencesView.as_view(), name='osago-references'),
+    path('api/osago/reference/<str:name>/', OsagoReferenceView.as_view(), name='osago-reference'),
+    path('api/osago/prefill/<int:car_id>/', OsagoPrefillView.as_view(), name='osago-prefill'),
+    path('api/osago/by-car/<int:car_id>/', OsagoByCarView.as_view(), name='osago-by-car'),
+    path('api/osago/create/', OsagoCreateView.as_view(), name='osago-create'),
+    path('api/osago/list/', OsagoListView.as_view(), name='osago-list'),
+    path('api/osago/<int:application_id>/', OsagoDetailView.as_view(), name='osago-detail'),
+    path('api/osago/<int:application_id>/status/', OsagoStatusView.as_view(), name='osago-status'),
     
 ]

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Client, RepaymentSchedule, InsuranceClient,
+    Client, RepaymentSchedule,
     ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, Send_Message, Notification,
     WaybillExtraName, AppVersion, AppAndroidVersion, 
 
@@ -61,15 +61,6 @@ class RepaymentScheduleAdmin(admin.ModelAdmin):
     ordering = ['paid_date']
 
 admin.site.register(RepaymentSchedule, RepaymentScheduleAdmin)
-
-
-class InsuranceClientAdmin(admin.ModelAdmin):
-    list_display = ['id','client', 'insurance_company', 'policy_number', 'start_date', 'end_date']
-    search_fields = ['client__client__fio', 'policy_number']
-    list_filter = ['insurance_company', 'start_date', 'end_date']
-
-admin.site.register(InsuranceClient, InsuranceClientAdmin)
-
 
 class ContactClientAdmin(admin.ModelAdmin):
     list_display = ['client', 'name', 'phone']

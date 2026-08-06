@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import  (
-    Client, RepaymentSchedule, InsuranceClient,
+    Client, RepaymentSchedule,OsagoApplication,
     ContactClient, LocationClient, AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ClientCar, \
     Send_Message, Notification, WaybillExtraName, AppVersion, AppAndroidVersion
 )
@@ -50,15 +50,29 @@ class ClientCarDetailSerializers(serializers.ModelSerializer):
             'due_days_interest', 'due_amount_principal', 'due_amount_interest', 'principal_balance', 'interest_balance', 
         ]
 
-class InsuranceClientSerializers(serializers.ModelSerializer):
+class OsagoApplicationSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    car_number = serializers.CharField(source='client_car.car_number', read_only=True)
+    car_model = serializers.CharField(source='client_car.car_model', read_only=True)
     client_car_full_name = serializers.SerializerMethodField()
-    
+    premium_tyiyn = serializers.IntegerField(read_only=True)
+ 
     class Meta:
-        model = InsuranceClient
-        fields = ['id','client','client_car_full_name', 'insurance_company', 'policy_number', 'start_date', 'end_date']
-    
+        model = OsagoApplication
+        fields = [
+            'id', 'status', 'status_display',
+            'client_car', 'car_number', 'car_model', 'client_car_full_name',
+            'summa_insurance', 'premiya_insurance', 'premium_tyiyn',
+            'polis_number', 'pdf_url', 'policy_status',
+            'period_ot', 'period_do',
+            'created_at', 'confirmed_at',
+        ]
+        read_only_fields = fields
+ 
     def get_client_car_full_name(self, obj):
-        return f"{obj.client.car_name} {obj.client.car_model} {obj.client.car_year}"
+        car = obj.client_car
+        return f"{car.car_name} {car.car_model} {car.car_year or ''}".strip()
+ 
 
 class ImagesAdCarsSerializer(serializers.ModelSerializer):
     class Meta:

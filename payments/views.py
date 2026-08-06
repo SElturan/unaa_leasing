@@ -1,137 +1,275 @@
-# payments/views.py
+import logging
+from datetime import timedelta
+ 
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as http_status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
-
-from datetime import timedelta
-
-from core.models import RepaymentSchedule
+from drf_spectacular.utils import extend_schema
+ 
+from core.models import RepaymentSchedule, OsagoApplication
+from core.osago_service import confirm_and_save
 from .models import Payment
-from .serializers import (
-    CreatePaymentSerializer, PaymentSerializer, BePayWebhookSerializer,
-)
+from .serializers import PaymentSerializer, BePayWebhookSerializer
 from .services import BePayClient, BePayError
-
-
+ 
+logger = logging.getLogger(__name__)
+ 
+QR_LIFETIME_MINUTES = 2
+ 
+ 
+# ---------------------------------------------------------
+# ОБЩАЯ ЧАСТЬ
+# ---------------------------------------------------------
+ 
+def _generate_qr(payment: Payment):
+    """Сходить в BePay за QR и сохранить результат в платёж."""
+    expires_at = timezone.now() + timedelta(minutes=QR_LIFETIME_MINUTES)
+ 
+    try:
+        bepay_response = BePayClient().generate_qr(
+            description=payment.description,
+            amount=payment.amount,
+            user_guid=payment.user_guid,
+            expires_at=expires_at,
+        )
+    except BePayError as e:
+        payment.status = Payment.STATUS_ERROR
+        payment.save(update_fields=["status"])
+        return Response({"detail": e.detail}, status=e.status_code)
+ 
+    if not bepay_response.get("uuid"):
+        payment.status = Payment.STATUS_ERROR
+        payment.save(update_fields=["status"])
+        logger.error("BePay не вернул uuid для платежа %s", payment.id)
+        return Response({"detail": "Не получен uuid от BePay"}, status=502)
+ 
+    payment.bepay_uuid = bepay_response["uuid"]
+    payment.qr_code_url = bepay_response.get("qrCode", "")
+    payment.qr_base64 = bepay_response.get("qr_base64", "")
+    payment.providers = bepay_response.get("providers", [])
+    payment.expires_at = expires_at
+    payment.save()
+ 
+    return Response(PaymentSerializer(payment).data, status=http_status.HTTP_201_CREATED)
+ 
+ 
+# ---------------------------------------------------------
+# 1. ОПЛАТА ПЛАТЕЖА ПО ГРАФИКУ (как было, ничего не изменилось)
+# ---------------------------------------------------------
+ 
 class CreateRepaymentPaymentView(APIView):
-    """Создать QR для оплаты конкретного платежа из графика погашения."""
+    """
+    Создать QR для оплаты платежа из графика погашения.
+ 
+    Фронт присылает только repayment_schedule_id.
+    Сумма берётся из базы — с фронта не принимается.
+    """
     permission_classes = [IsAuthenticated]
-
+ 
+    @extend_schema(
+        summary="Оплатить платёж по графику",
+        responses=PaymentSerializer,
+        tags=["Платежи"],
+    )
     def post(self, request):
         repayment_id = request.data.get("repayment_schedule_id")
         if not repayment_id:
             raise ValidationError({"error": "Не передан repayment_schedule_id"})
-
+ 
         try:
             repayment = RepaymentSchedule.objects.select_related("car_client").get(
                 id=repayment_id,
-                car_client__client=request.user.client,   # проверка владения!
+                car_client__client=request.user.client,
             )
         except RepaymentSchedule.DoesNotExist:
             raise ValidationError({"error": "Платёж не найден или не принадлежит вам"})
-
+ 
         if repayment.is_paid == "is_paid":
             return Response({"error": "Этот платёж уже оплачен"}, status=400)
-
-        # сумма — только из БД, в сомах с копейками (Decimal)
-        amount_som = repayment.total_payment
-        amount_tyiyn = int((amount_som * 100).to_integral_value())  # 15400.00 сом → 1540000 тыйын
-
-        expires_at = timezone.now() + timedelta(minutes=2)
-
+ 
+        amount_tyiyn = int((repayment.total_payment * 100).to_integral_value())
+ 
         payment = Payment.objects.create(
-            description=f"Платёж по графику #{repayment.id}",
-            amount=amount_tyiyn,
+            purpose=Payment.PURPOSE_REPAYMENT,
+            client=request.user.client,
             repayment_schedule=repayment,
-            expires_at=expires_at,
-)
-
-        expires_at = (timezone.now() + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        try:
-            bepay_response = BePayClient().generate_qr(
-                description=payment.description,
-                amount=payment.amount,
-                user_guid=payment.user_guid,
-                expires_at=expires_at,   # НОВОЕ
-            )
-        except BePayError as e:
-            payment.status = Payment.STATUS_ERROR
-            payment.save(update_fields=["status"])
-            return Response({"detail": e.detail}, status=e.status_code)
-
-        payment.bepay_uuid = bepay_response["uuid"]
-        payment.qr_code_url = bepay_response.get("qrCode", "")
-        payment.providers = bepay_response.get("providers", [])
-        payment.save()
-
-        return Response(PaymentSerializer(payment).data, status=201)
-
-class PaymentStatusView(APIView):
-    """Фронт может периодически опрашивать статус (запасной вариант к webhook)."""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, user_guid):
-        payment = get_object_or_404(
-            Payment,
-            user_guid=user_guid,
-            repayment_schedule__car_client__client=request.user.client,
+            description=f"Платёж по графику #{repayment.id}"[:99],
+            amount=amount_tyiyn,
         )
-
+ 
+        return _generate_qr(payment)
+ 
+ 
+# ---------------------------------------------------------
+# 2. ОПЛАТА ПОЛИСА ОСАГО (новое)
+# ---------------------------------------------------------
+ 
+class CreateOsagoPaymentView(APIView):
+    """
+    Создать QR для оплаты полиса ОСАГО.
+ 
+    Фронт присылает только osago_application_id.
+    Сумма берётся из заявки — её вернул Сакбол на шаге create_osago.
+    """
+    permission_classes = [IsAuthenticated]
+ 
+    @extend_schema(
+        summary="Оплатить полис ОСАГО",
+        responses=PaymentSerializer,
+        description="После успешной оплаты полис выпускается автоматически.",
+        tags=["ОСАГО"],
+    )
+    def post(self, request):
+        application_id = request.data.get("osago_application_id")
+        if not application_id:
+            raise ValidationError({"error": "Не передан osago_application_id"})
+ 
+        application = get_object_or_404(
+            OsagoApplication, id=application_id, client=request.user.client
+        )
+ 
+        if application.status == OsagoApplication.STATUS_CONFIRMED:
+            return Response({"error": "Полис уже выпущен"}, status=400)
+ 
+        if not application.external_guid or not application.premiya_insurance:
+            return Response(
+                {"error": "Заявка не создана в страховой, оплата невозможна"},
+                status=400
+            )
+ 
+        # если живой QR уже есть — отдаём его, а не создаём второй
+        active = application.payments.filter(
+            status__in=[Payment.STATUS_CREATED, Payment.STATUS_IN_PROCESS],
+            expires_at__gt=timezone.now(),
+        ).first()
+        if active:
+            return Response(PaymentSerializer(active).data, status=200)
+ 
+        payment = Payment.objects.create(
+            purpose=Payment.PURPOSE_OSAGO,
+            client=request.user.client,
+            osago_application=application,
+            description=f"ОСАГО {application.client_car.car_number}"[:99],
+            amount=application.premium_tyiyn,
+        )
+ 
+        return _generate_qr(payment)
+ 
+ 
+# ---------------------------------------------------------
+# 3. СТАТУС ПЛАТЕЖА (общий для обоих видов)
+# ---------------------------------------------------------
+ 
+class PaymentStatusView(APIView):
+    """Опрос статуса платежа. Работает и для графика, и для ОСАГО."""
+    permission_classes = [IsAuthenticated]
+ 
+    @extend_schema(summary="Статус платежа", responses=PaymentSerializer, tags=["Платежи"])
+    def get(self, request, user_guid):
+        # Проверка владельца по прямому FK client.
+        # Раньше шла через repayment_schedule — для ОСАГО так не работает.
+        payment = get_object_or_404(
+            Payment, user_guid=user_guid, client=request.user.client
+        )
+ 
         if not payment.is_final() and payment.bepay_uuid:
             try:
                 data = BePayClient().get_status(payment.bepay_uuid)
                 _apply_status_update(payment, data)
             except BePayError:
                 pass  # отдаём последний известный локальный статус
-
+ 
         return Response(PaymentSerializer(payment).data)
-
-
+ 
+ 
+# ---------------------------------------------------------
+# 4. ВЕБХУК BEPAY
+# ---------------------------------------------------------
+ 
 class BePayWebhookView(APIView):
+    """
+    Этот URL вписывается в личном кабинете BePay.
+    BePay стучится сюда сам, когда меняется статус оплаты.
+    """
     authentication_classes = []
     permission_classes = []
-
+ 
     def post(self, request):
         serializer = BePayWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
-
+ 
         try:
             payment = Payment.objects.get(
                 bepay_uuid=payload.get("qr_transaction_id") or payload["uuid"]
             )
         except Payment.DoesNotExist:
+            logger.warning("BePay webhook: платёж не найден, uuid=%s", payload.get("uuid"))
             return Response(status=http_status.HTTP_404_NOT_FOUND)
-
-        # Перепроверяем статус напрямую у BePay, не доверяя только телу вебхука
+ 
+        # Телу вебхука не доверяем: подписи у него нет.
+        # Используем его только как сигнал "иди проверь статус".
         try:
-            verified_data = BePayClient().get_status(payment.bepay_uuid)
-        except BePayError:
-            return Response(status=http_status.HTTP_202_ACCEPTED)  # попробуем при следующем вебхуке/поллинге
-
-        _apply_status_update(payment, verified_data)
+            verified = BePayClient().get_status(payment.bepay_uuid)
+        except BePayError as e:
+            logger.warning("BePay webhook: не удалось проверить статус: %s", e)
+            return Response(status=http_status.HTTP_202_ACCEPTED)
+ 
+        _apply_status_update(payment, verified)
         return Response(status=http_status.HTTP_200_OK)
-
-
+ 
+ 
 def _apply_status_update(payment: Payment, data: dict):
+    """
+    Обновляет статус платежа.
+    Что делать дальше — зависит от назначения платежа.
+    """
     new_status = data.get("status")
     if new_status is None or payment.status == new_status:
         return
-
+ 
     payment.status = new_status
-
+ 
     if new_status == Payment.STATUS_SUCCESS:
         payment.executed_at = timezone.now()
-
-        # НОВОЕ: если платёж привязан к конкретной строке графика — помечаем оплаченным
-        if payment.repayment_schedule and payment.repayment_schedule.is_paid != "is_paid":
-            repayment = payment.repayment_schedule
-            repayment.is_paid = "is_paid"
-            repayment.save(update_fields=["is_paid"])
-
+ 
+        if payment.purpose == Payment.PURPOSE_REPAYMENT:
+            _on_repayment_paid(payment)
+        elif payment.purpose == Payment.PURPOSE_OSAGO:
+            _on_osago_paid(payment)
+ 
     payment.save()
+ 
+ 
+def _on_repayment_paid(payment: Payment):
+    """Платёж по графику оплачен — помечаем строку графика."""
+    schedule = payment.repayment_schedule
+    if not schedule or schedule.is_paid == "is_paid":
+        return
+ 
+    schedule.is_paid = "is_paid"
+    schedule.is_paid_1c = "is_paid"
+    schedule.save(update_fields=["is_paid", "is_paid_1c"])
+    logger.info("График #%s оплачен через BePay", schedule.id)
+ 
+ 
+def _on_osago_paid(payment: Payment):
+    """
+    Полис оплачен — теперь можно вызывать confirm_osago,
+    который списывает деньги с баланса компании у Сакбола.
+    """
+    application = payment.osago_application
+    if not application or application.status == OsagoApplication.STATUS_CONFIRMED:
+        return
+ 
+    application.status = OsagoApplication.STATUS_PAID
+    application.save(update_fields=["status"])
+ 
+    # Если Сакбол недоступен — статус останется paid,
+    # и OsagoStatusView попробует снова при следующем опросе.
+    confirm_and_save(application)
+ 

@@ -1,6 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
-
+import os
 import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -206,6 +206,30 @@ CHANNEL_LAYERS = {
 BEPAY_BASE_URL = ('https://api.bepay.kg')
 BEPAY_MERCHANT_ID = ('574fbabf-8c47-4567-9be8-896921cfb7ef')
 BEPAY_SECRET_KEY = ('f1df303f-d9b3-495e-8fed-5d544a3bb211')
+
+OSAGO_BASE_URL = os.environ.get('OSAGO_BASE_URL')   # {domain}/api от Сакбола
+OSAGO_API_KEY = os.environ.get('OSAGO_API_KEY')
+OSAGO_TIMEOUT = int(os.environ.get('OSAGO_TIMEOUT', 60))
+
+ONEC_URL = os.environ.get(
+    'ONEC_URL',
+    'http://213.109.69.182:11778/service/hs/rep/unaa_report'
+)
+ONEC_USER = os.environ.get('ONEC_USER', 'ReportService')
+ONEC_PASSWORD = os.environ.get('ONEC_PASSWORD', 'vLFuwAFk')
+ 
+# таймаут запроса к 1С, сек (полная выгрузка может быть долгой)
+ONEC_TIMEOUT = int(os.environ.get('ONEC_TIMEOUT', 180))
+ 
+# диапазон ежедневной синхронизации: ±18 месяцев по умолчанию
+# Фиксированная дата начала выгрузки
+ONEC_SYNC_BEGIN_DATE = os.environ.get('ONEC_SYNC_BEGIN_DATE', '2023-01-01')
+# диапазон поиска клиента при регистрации: 7 дней по умолчанию
+ONEC_REGISTRATION_DAYS = int(os.environ.get('ONEC_REGISTRATION_DAYS', 7))
+ 
+# таймаут запроса при регистрации — человек ждёт на экране,
+# долго держать нельзя
+ONEC_REGISTRATION_TIMEOUT = int(os.environ.get('ONEC_REGISTRATION_TIMEOUT', 20))
 
 JAZZMIN_SETTINGS = {
     "site_title": "unaa_leasing",

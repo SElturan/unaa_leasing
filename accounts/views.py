@@ -8,6 +8,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from accounts.models import User
 from accounts.serializers import UserLoginSerializer, UserRegisterSerializer,ExpoPushTokenSerializer
 from core.models import Client
+from core.sync_1c import normalize_phone, find_client_in_1c, OneCError
+import logging
+
+logger = logging.getLogger(__name__)
+ 
 
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
@@ -37,57 +42,84 @@ class UserLoginView(generics.GenericAPIView):
         else:
             return Response({"error": "Invalid phone or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
-
+ 
 class UserRegisterView(generics.GenericAPIView):
+    """
+    Регистрация клиента.
+ 
+    Порядок поиска:
+      1. Ищем в нашей базе по нормализованному телефону.
+      2. Если нет — идём в 1С за последние ONEC_REGISTRATION_DAYS дней
+         (клиент мог оформить договор уже после последней синхронизации).
+      3. Если и там нет — отказ.
+    """
     serializer_class = UserRegisterSerializer
-
+ 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        phone = serializer.validated_data['phone']
+ 
+        phone_raw = serializer.validated_data['phone']
         password = serializer.validated_data['password']
         password2 = serializer.validated_data.get('password2')
-
+ 
         if password2 and password != password2:
             return Response(
                 {"error": "Пароли не совпадают"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        client = Client.objects.filter(phone=phone).first()
-        if not client:
+ 
+        phone = normalize_phone(phone_raw)
+        if not phone:
             return Response(
-                {"error": "Ваш номер не найден среди клиентов Унаа Лизинг\n"
-                          "Пожалуйста, попробуйте еще раз через 24 часа"},
-                status=status.HTTP_401_UNAUTHORIZED
+                {"error": "Некорректный номер телефона"},
+                status=status.HTTP_400_BAD_REQUEST
             )
-
-        user = User.objects.filter(phone=phone).first()
-        if not user:
-            user = User.objects.create(
-                phone=phone,
-                client=client,
-                is_active=True
-            )
-            user.set_password(password)
-            user.save()
-
-            refresh = RefreshToken.for_user(user)
-
-            return Response({
-                "id": user.id,
-                "phone": user.phone,
-                "client_id": client.id,
-                "is_active": user.is_active,
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-            }, status=status.HTTP_200_OK)
-        else:
+ 
+        # у пользователя телефон тоже храним нормализованным,
+        # иначе логин "996500..." не найдёт юзера "0500..."
+        if User.objects.filter(phone=phone).exists():
             return Response(
                 {"error": "Пользователь с таким номером уже существует"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+ 
+        # 1. локальный поиск
+        client = Client.objects.filter(phone=phone).first()
+ 
+        # 2. не нашли — спрашиваем 1С
+        if not client:
+            try:
+                client = find_client_in_1c(phone)
+            except OneCError as e:
+                logger.error("Регистрация: 1С недоступна (%s)", e)
+                return Response(
+                    {"error": "Сервис временно недоступен, попробуйте через несколько минут"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+ 
+        # 3. нигде нет
+        if not client:
+            return Response(
+                {"error": "Ваш номер не найден среди клиентов Унаа Лизинг.\n"
+                          "Если вы недавно оформили договор, обратитесь в офис."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+ 
+        user = User.objects.create(phone=phone, client=client, is_active=True)
+        user.set_password(password)
+        user.save()
+ 
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "id": user.id,
+            "phone": user.phone,
+            "client_id": client.id,
+            "is_active": user.is_active,
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }, status=status.HTTP_200_OK)
+ 
 
 class CustomTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]

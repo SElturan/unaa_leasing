@@ -3,11 +3,13 @@ from django.db import models
 
 class Client(models.Model):
     fio = models.CharField(max_length=255, verbose_name='ФИО')
-    phone = models.CharField(null=True, blank=True, max_length=50, verbose_name='Телефон')
+    client_guid = models.UUIDField(null=True, blank=True,verbose_name='GUID клиента из 1С')
+    phone = models.CharField(null=True, blank=True, unique=True, max_length=50, verbose_name='Телефон')
     email = models.EmailField(null=True, blank=True, max_length=255, verbose_name='Email')
     whatsapp = models.CharField(null=True, blank=True, max_length=50, verbose_name='WhatsApp')
     residence = models.CharField(null=True, blank=True, max_length=255, verbose_name='Место жительства')
     registration_address = models.CharField(null=True, blank=True, max_length=255, verbose_name='Регистрация')
+    synced_at = models.DateTimeField(null=True, blank=True,verbose_name='Синхронизирован с 1С')
 
     class Meta:
         verbose_name = 'Клиент'
@@ -18,11 +20,11 @@ class Client(models.Model):
 
 class ClientCar(models.Model):
     client = models.ForeignKey( Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='client_car') 
-    client_guid = models.UUIDField(null=True, blank=True, unique=True, verbose_name='GUID клиента из 1С')
+    client_guid = models.UUIDField(null=True, blank=True,verbose_name='GUID клиента из 1С')
     deal_number = models.CharField(null=True, blank=True, max_length=50, verbose_name='Номер сделки')
-    car_name = models.CharField(max_length=255, verbose_name='Название автомобиля')
-    car_model = models.CharField(max_length=255, verbose_name='Модель автомобиля')
-    car_year = models.IntegerField(verbose_name='Год автомобиля')
+    car_name = models.CharField(null=True, blank=True,max_length=255, verbose_name='Название автомобиля')
+    car_model = models.CharField(null=True, blank=True,max_length=255, verbose_name='Модель автомобиля')
+    car_year = models.IntegerField(null=True, blank=True,verbose_name='Год автомобиля')
     car_color = models.CharField(null=True, blank=True, max_length=50, verbose_name='Цвет автомобиля')
     car_vin = models.CharField(null=True, blank=True, max_length=50, verbose_name='VIN номер')
     car_number = models.CharField(null=True, blank=True, max_length=50, verbose_name='Номер автомобиля')
@@ -44,15 +46,11 @@ class ClientCar(models.Model):
     principal_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по основному долгу')
     interest_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по процентам')
     penalty_balance = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Остаток по пене')
+    synced_at = models.DateTimeField(null=True, blank=True, verbose_name='Синхронизирован с 1С')
 
     class Meta:
         verbose_name = 'Авто клиентов'
         verbose_name_plural = 'Авто клиентов'
- 
-        constraints = [
-            models.UniqueConstraint(fields=['client_guid'], name='unique_client_guid'),
-            models.UniqueConstraint(fields=['loan_guid'], name='unique_loan_guid')
-        ]
 
     def __str__(self):
         return self.client.fio
@@ -85,36 +83,130 @@ class RepaymentSchedule(models.Model):
     paid_date = models.DateField(null=True, blank=True, verbose_name='Дата погашения')
     overdue_amount = models.DecimalField(null=True, blank=True, max_digits=12, decimal_places=2, verbose_name='Просрочки')
     is_paid = models.CharField( choices=IS_PAID_CHOICES, verbose_name='Оплата',)
+    is_paid_1c = models.CharField(max_length=20, null=True, blank=True, verbose_name='Оплата из 1С')
     last_reminder_sent = models.DateField(null=True, blank=True, verbose_name='Дата последнего напоминания')
 
     class Meta:
         verbose_name = 'График погашения'
         verbose_name_plural = 'Графики погашения'
         ordering = ['paid_date']
-
+        constraints = [
+            models.UniqueConstraint(
+                fields=['car_client', 'paid_date'],
+                name='unique_schedule_per_car_date'
+            ),
+        ]
+ 
     def __str__(self):
         return f"{self.car_client.client.fio} - {self.paid_date}"
 
-class InsuranceClient(models.Model):
-    INSURANCE_CHOICES = [
-        ('OSAGO', 'ОСАГО'),
-        ('KASKO', 'КАСКО'),
+class OsagoApplication(models.Model):
+    """
+    Полис ОСАГО: от заявки до выпущенного документа.
+ 
+    Заменяет прежнюю модель InsuranceClient. Данные о страховках
+    из 1С больше не импортируются — там эти поля всегда пустые.
+ 
+    Жизненный цикл:
+        draft     — черновик собран у нас, в страховую ещё не ушёл
+        created   — create_osago прошёл, есть guid и сумма премии, ждём оплату
+        paid      — клиент оплатил премию через BePay
+        confirmed — confirm_osago прошёл, полис выпущен (есть номер и PDF)
+        failed    — подтверждение не прошло, нужен разбор вручную
+    """
+ 
+    STATUS_DRAFT = 'draft'
+    STATUS_CREATED = 'created'
+    STATUS_PAID = 'paid'
+    STATUS_CONFIRMED = 'confirmed'
+    STATUS_FAILED = 'failed'
+ 
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Черновик'),
+        (STATUS_CREATED, 'Создана в страховой, ждёт оплаты'),
+        (STATUS_PAID, 'Оплачена, подтверждается'),
+        (STATUS_CONFIRMED, 'Полис выпущен'),
+        (STATUS_FAILED, 'Ошибка подтверждения'),
     ]
-
-    client = models.ForeignKey(ClientCar, on_delete=models.CASCADE, verbose_name='Клиент', related_name='insurances')
-    insurance_company = models.CharField(max_length=255, choices=INSURANCE_CHOICES ,verbose_name='Страховая компания')
-    policy_number = models.CharField(max_length=50, verbose_name='Номер полиса')
-    start_date = models.DateField(verbose_name='Дата начала')
-    end_date = models.DateField(verbose_name='Дата окончания')
-    last_reminder_sent = models.DateField(null=True, blank=True, verbose_name='Дата последнего напоминания')
-
+ 
+    client = models.ForeignKey(
+        'Client', on_delete=models.CASCADE,
+        related_name='osago_applications', verbose_name='Клиент'
+    )
+    client_car = models.ForeignKey(
+        'ClientCar', on_delete=models.CASCADE,
+        related_name='osago_applications', verbose_name='Автомобиль'
+    )
+ 
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT,
+        verbose_name='Статус заявки'
+    )
+ 
+    # --- данные от страховой ---
+    external_guid = models.UUIDField(
+        null=True, blank=True, unique=True,
+        verbose_name='GUID полиса в страховой'
+    )
+    summa_insurance = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        verbose_name='Страховая сумма'
+    )
+    premiya_insurance = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        verbose_name='Страховая премия (к оплате)'
+    )
+ 
+    polis_number = models.CharField(max_length=100, blank=True, verbose_name='Серия и номер полиса')
+    pdf_url = models.URLField(blank=True, max_length=500, verbose_name='Ссылка на PDF полиса')
+    policy_status = models.CharField(
+        max_length=20, blank=True,
+        verbose_name='Статус полиса (ACTIVE/CANCELED/EXPIRED/NOT_ACTIVE)'
+    )
+ 
+    period_ot = models.DateField(null=True, blank=True, verbose_name='Период страхования с')
+    period_do = models.DateField(null=True, blank=True, verbose_name='Период страхования по')
+ 
+    request_payload = models.JSONField(default=dict, blank=True, verbose_name='Отправленные данные')
+    last_error = models.TextField(blank=True, verbose_name='Последняя ошибка')
+ 
+    # для напоминаний об истечении (аналог last_reminder_sent в графике)
+    last_reminder_sent = models.DateField(
+        null=True, blank=True, verbose_name='Дата последнего напоминания'
+    )
+ 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата выпуска полиса')
+ 
     class Meta:
-        verbose_name = 'Страхование клиента'
-        verbose_name_plural = 'Страхования клиентов'
-
+        verbose_name = 'Полис ОСАГО'
+        verbose_name_plural = 'Полисы ОСАГО'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['client', '-created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['period_do']),
+        ]
+ 
     def __str__(self):
-        return f"{self.client.client.fio} - {self.insurance_company}"
-
+        return f"ОСАГО {self.client.fio} / {self.client_car.car_number} ({self.get_status_display()})"
+ 
+    @property
+    def premium_tyiyn(self) -> int:
+        """Премия в тыйынах — в таком виде её принимает BePay."""
+        if self.premiya_insurance is None:
+            return 0
+        return int((self.premiya_insurance * 100).to_integral_value())
+ 
+    @property
+    def is_active_policy(self) -> bool:
+        """Выпущенный и не отменённый полис."""
+        return (
+            self.status == self.STATUS_CONFIRMED
+            and self.policy_status not in ('CANCELED', 'EXPIRED')
+        )
+ 
 
 class ContactClient(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name='Клиент', related_name='contacts')

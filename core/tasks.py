@@ -3,11 +3,14 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import date, timedelta
 
-from .models import RepaymentSchedule, InsuranceClient, Notification
+from .models import RepaymentSchedule, Notification, OsagoApplication
 from .expo_push import send_push_message
 from accounts.models import User
-from core.fetch_1c_data import import_clients_from_1c
 
+import logging
+ 
+from .sync_1c import sync_full, import_from_1c, OneCError
+ 
 # Точки напоминания. Отрицательные — "за N дней до", положительные — "через N дней после".
 PAYMENT_REMINDER_DAYS_BEFORE = [3, 1, 0]        # за 3 дня, за 1 день, в день платежа
 PAYMENT_REMINDER_DAYS_AFTER = [1, 3, 7, 14, 30]  # потом раз в 2 недели, дальше — тишина
@@ -15,6 +18,39 @@ PAYMENT_REMINDER_DAYS_AFTER = [1, 3, 7, 14, 30]  # потом раз в 2 нед
 INSURANCE_REMINDER_DAYS_BEFORE = [30, 14, 7, 3, 1]
 INSURANCE_REMINDER_DAYS_AFTER = [1, 7, 30]
 
+
+logger = logging.getLogger(__name__)
+ 
+ 
+@shared_task(bind=True, max_retries=3)
+def sync_1c_task(self):
+    """
+    Ежедневная синхронизация с 1С. Запускается в 07:00 по Бишкеку.
+ 
+    Диапазон берётся из настроек (ONEC_SYNC_DAYS_BACK/FORWARD),
+    менять можно через .env без правки кода.
+    """
+    try:
+        stats = sync_full()
+        logger.info("Синхронизация с 1С: %s", stats)
+        return str(stats)
+    except OneCError as e:
+        logger.error("Синхронизация с 1С не удалась: %s", e)
+        # 1С могла быть недоступна — пробуем ещё через 10 минут
+        raise self.retry(exc=e, countdown=600)
+ 
+ 
+@shared_task
+def sync_1c_client_task(customer_guid=None, customer_name=None):
+    """Точечная синхронизация одного клиента — для кнопки в админке."""
+    try:
+        stats = import_from_1c(
+            customer_guid=customer_guid,
+            customer_name=customer_name,
+        )
+        return str(stats)
+    except OneCError as e:
+        return f"error: {e}"
 
 def _get_user_and_token(client_obj):
     """client_obj — Client (через car_client.client или напрямую)."""
@@ -89,61 +125,75 @@ def _process_repayments(today):
 
 
 def _process_insurance_upcoming(today):
-    candidates = InsuranceClient.objects.filter(
-        end_date__gte=today,
-        end_date__lte=today + timedelta(days=max(INSURANCE_REMINDER_DAYS_BEFORE)),
-    ).select_related("client", "client__client")
-
-    for ins in candidates:
-        if ins.last_reminder_sent == today:
+    """
+    Напоминания о скором окончании полиса.
+    Берём ТОЛЬКО выпущенные полисы — черновики и неоплаченные заявки
+    не должны порождать уведомления.
+    """
+    candidates = OsagoApplication.objects.filter(
+        status=OsagoApplication.STATUS_CONFIRMED,
+        period_do__gte=today,
+        period_do__lte=today + timedelta(days=max(INSURANCE_REMINDER_DAYS_BEFORE)),
+    ).exclude(
+        policy_status__in=['CANCELED', 'EXPIRED']
+    ).select_related('client', 'client_car')
+ 
+    for policy in candidates:
+        if policy.last_reminder_sent == today:
             continue
-
-        days_to_expire = (ins.end_date - today).days
+ 
+        days_to_expire = (policy.period_do - today).days
         if days_to_expire not in INSURANCE_REMINDER_DAYS_BEFORE:
             continue
-
-        user, token = _get_user_and_token(ins.client.client)
+ 
+        user, token = _get_user_and_token(policy.client)
         if not token:
             continue
-
+ 
         title = "Страховка скоро закончится"
-        message = (f"Страховка {ins.get_insurance_company_display()} по машине "
-                    f"{ins.client.car_model} истекает через {days_to_expire} дн.")
-
+        message = (
+            f"Полис ОСАГО по машине {policy.client_car.car_model} "
+            f"истекает через {days_to_expire} дн."
+        )
+ 
         if _notify(user, token, title, message):
-            ins.last_reminder_sent = today
-            ins.save(update_fields=["last_reminder_sent"])
-
+            policy.last_reminder_sent = today
+            policy.save(update_fields=['last_reminder_sent'])
+ 
 
 def _process_insurance_expired(today):
-    candidates = InsuranceClient.objects.filter(
-        end_date__lt=today,
-        end_date__gte=today - timedelta(days=max(INSURANCE_REMINDER_DAYS_AFTER)),
-    ).select_related("client", "client__client")
-
-    for ins in candidates:
-        if ins.last_reminder_sent == today:
+    """Напоминания о просроченном полисе."""
+    candidates = OsagoApplication.objects.filter(
+        status=OsagoApplication.STATUS_CONFIRMED,
+        period_do__lt=today,
+        period_do__gte=today - timedelta(days=max(INSURANCE_REMINDER_DAYS_AFTER)),
+    ).select_related('client', 'client_car')
+ 
+    for policy in candidates:
+        if policy.last_reminder_sent == today:
             continue
-
-        days_expired = (today - ins.end_date).days
+ 
+        days_expired = (today - policy.period_do).days
         if days_expired not in INSURANCE_REMINDER_DAYS_AFTER:
             continue
-
-        user, token = _get_user_and_token(ins.client.client)
+ 
+        user, token = _get_user_and_token(policy.client)
         if not token:
             continue
-
+ 
         title = "Страховка просрочена"
-        message = (f"Страховка {ins.get_insurance_company_display()} по машине "
-                    f"{ins.client.car_model} просрочена на {days_expired} дн. "
-                    f"Пожалуйста, обновите полис.")
-
+        message = (
+            f"Полис ОСАГО по машине {policy.client_car.car_model} "
+            f"просрочен на {days_expired} дн. Пожалуйста, оформите новый."
+        )
+ 
         if _notify(user, token, title, message):
-            ins.last_reminder_sent = today
-            ins.save(update_fields=["last_reminder_sent"])
-
-
-@shared_task
-def import_clients_daily():
-    import_clients_from_1c()
-    return "Импорт из 1С завершён"
+            policy.last_reminder_sent = today
+            policy.save(update_fields=['last_reminder_sent'])
+ 
+ 
+def _get_user_and_token(client):
+    """client — объект Client (раньше приходилось идти через ins.client.client)."""
+    from accounts.models import User
+    user = User.objects.filter(client=client).first()
+    return user, getattr(user, 'expo_push_token', None)

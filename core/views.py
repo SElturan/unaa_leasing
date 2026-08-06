@@ -22,19 +22,19 @@ from rest_framework.generics import (
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import (
-    Client, ClientCar, RepaymentSchedule, InsuranceClient,
+    Client, ClientCar, RepaymentSchedule,
     AdCars, CalculateInfo, ImagesClientCar, ImagesAdCars, ContactClient,
     Send_Message, LocationClient, Notification, WaybillExtraName,
-    AppVersion, AppAndroidVersion,
+    AppVersion, AppAndroidVersion, OsagoApplication
 )
 from .serializers import (
     ClientSerializers, ClientCarSerializers, ClientCarDetailSerializers,
-    RepaymentDetailScheduleSerializer, InsuranceClientSerializers,
+    RepaymentDetailScheduleSerializer,
     AdCarsSerializers, AdCarsDetailSerializers, ContactClientSerializers,
     LocationClientSerializers, LocationClientDetailSerializers,
     SendMessageSerializer, NotificationSerializer,
     LeasingCalcInputSerializer, LeasingResultSerializer,
-    WaybillExtraNameSerializer, AppVersionSerializer, AppAndroidVersionSerializer,
+    WaybillExtraNameSerializer, AppVersionSerializer, AppAndroidVersionSerializer, OsagoApplicationSerializer
 )
 from .calculations import calculate_leasing
 
@@ -96,7 +96,7 @@ class ClientInfoRetrieveAPIView(RetrieveAPIView):
         return Response({
             'client': ClientSerializers(client).data,
             'cars': ClientCarDetailSerializers(cars, many=True).data,
-            'insurance': InsuranceClientSerializers(InsuranceClient.objects.filter(client__in=cars), many=True).data,
+            'insurance': OsagoApplicationSerializer(OsagoApplication.objects.filter(client_car__in=cars), many=True).data,
             'location': LocationClientDetailSerializers(latest_location).data if latest_location else None,
         })
 
@@ -495,40 +495,40 @@ class LocationClientRetrieveAPIView(RetrieveAPIView):
 # ==========================================================
 # СТРАХОВКИ (ОСАГО / КАСКО)
 # ==========================================================
-
 @extend_schema_view(
     get=extend_schema(
-        summary="Мои страховки",
-        description="Все страховки по всем машинам текущего клиента (ОСАГО и КАСКО вперемешку).",
+        summary="Мои полисы ОСАГО",
+        description="Все полисы и заявки по машинам текущего клиента.",
         tags=["Страховки"],
     )
 )
-class InsuranceClientListAPIView(ListAPIView):
-    serializer_class = InsuranceClientSerializers
+class OsagoListAPIView(ListAPIView):
+    serializer_class = OsagoApplicationSerializer
     permission_classes = [IsAuthenticated]
-
+ 
     def get_queryset(self):
-        user = self.request.user
-        queryset = InsuranceClient.objects.filter(client=user.client.id)
-        if queryset:
-            return queryset
-        return InsuranceClient.objects.none()
-
-
+        client = getattr(self.request.user, 'client', None)
+        if not client:
+            return OsagoApplication.objects.none()
+        return OsagoApplication.objects.filter(
+            client=client
+        ).select_related('client_car')
+ 
+ 
+# БЫЛО: InsuranceClientListByClientIdAPIView
 @extend_schema_view(
     get=extend_schema(
-        summary="Страховки по client_id (для админки)",
+        summary="Полисы ОСАГО по client_id (для админки)",
         tags=["Страховки"],
     )
 )
-class InsuranceClientListByClientIdAPIView(ListAPIView):
-    serializer_class = InsuranceClientSerializers
-    lookup_field = 'client_id'
-
+class OsagoListByClientIdAPIView(ListAPIView):
+    serializer_class = OsagoApplicationSerializer
+ 
     def get_queryset(self):
-        return InsuranceClient.objects.filter(client_id=self.kwargs['client_id'])
-
-
+        return OsagoApplication.objects.filter(
+            client_id=self.kwargs['client_id']
+        ).select_related('client_car')
 # ==========================================================
 # РАССЫЛКИ И УВЕДОМЛЕНИЯ
 # ==========================================================
@@ -597,15 +597,18 @@ class ClientReportListView(ListAPIView):
         tags=["Отчёты"],
     )
     def list(self, request, *args, **kwargs):
-        clients = Client.objects.prefetch_related(
-            Prefetch('client_car__insurances')
-        )
+        clients = Client.objects.prefetch_related('client_car__osago_applications')
+
 
         report = []
         for client in clients:
             for car in client.client_car.all():
-                osago = next((ins for ins in car.insurances.all() if ins.insurance_company == 'OSAGO'), None)
-                kasko = next((ins for ins in car.insurances.all() if ins.insurance_company == 'KASKO'), None)
+                osago = next(
+                    (a for a in car.osago_applications.all()
+                    if a.status == OsagoApplication.STATUS_CONFIRMED),
+                    None
+                )
+                kasko = None   # КАСКО больше не ведём — модель удалена
 
                 report.append({
                     "client_fio": client.fio,
