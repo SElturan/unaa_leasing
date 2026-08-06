@@ -15,6 +15,7 @@ from core.osago_service import confirm_and_save
 from .models import Payment
 from .serializers import PaymentSerializer, BePayWebhookSerializer
 from .services import BePayClient, BePayError
+from core.telegram_notify import notify_payment_success
  
 logger = logging.getLogger(__name__)
  
@@ -243,6 +244,9 @@ def _apply_status_update(payment: Payment, data: dict):
             _on_osago_paid(payment)
  
     payment.save()
+
+    if new_status == Payment.STATUS_SUCCESS:
+        notify_payment_success(payment)
  
  
 def _on_repayment_paid(payment: Payment):

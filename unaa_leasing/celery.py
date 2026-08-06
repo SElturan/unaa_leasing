@@ -26,6 +26,10 @@ app.conf.beat_schedule = {
         'task': 'core.tasks.import_clients_daily',
         'schedule': crontab(hour=16, minute=0),
     },
+        'daily_payments_summary': {
+        'task': 'core.tasks.daily_payments_summary_task',
+        'schedule': crontab(hour=18, minute=0),
+    },
 }
 
 # app.conf.beat_schedule = {

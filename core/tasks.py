@@ -4,6 +4,7 @@ from django.utils import timezone
 from datetime import date, timedelta
 
 from .models import RepaymentSchedule, Notification, OsagoApplication
+from .telegram_notify import notify_daily_summary
 from .expo_push import send_push_message
 from accounts.models import User
 
@@ -197,3 +198,9 @@ def _get_user_and_token(client):
     from accounts.models import User
     user = User.objects.filter(client=client).first()
     return user, getattr(user, 'expo_push_token', None)
+
+@shared_task
+def daily_payments_summary_task():
+    """Итог за день бухгалтеру. Запускается в 18:00 по Бишкеку."""
+    notify_daily_summary()
+    return "ok"
