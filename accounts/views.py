@@ -40,7 +40,7 @@ class UserLoginView(generics.GenericAPIView):
                 'access': str(refresh.access_token)
             }, status=status.HTTP_200_OK)
         else:
-            return Response({"error": "Invalid phone or password"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Неверный номер или пароль"}, status=status.HTTP_401_UNAUTHORIZED)
 
  
 class UserRegisterView(generics.GenericAPIView):
