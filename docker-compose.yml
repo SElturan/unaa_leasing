@@ -18,24 +18,16 @@ services:
     image: unaa_leasing:${IMAGE_TAG:-latest}
     build: .
     command: gunicorn unaa_leasing.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    restart: always
     env_file:
       - .env
     depends_on:
       - db
     ports:
-      - "8000:8000"          # хостовый nginx будет ходить сюда
+      - "8000:8000"
     volumes:
       - ./static:/app/staticfiles
       - ./media:/app/media
-    deploy:
-      replicas: 2
-      update_config:
-        parallelism: 1
-        delay: 5s
-        order: start-first
-        failure_action: rollback
-      restart_policy:
-        condition: any
 
   redis:
     image: "redis:alpine"

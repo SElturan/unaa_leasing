@@ -100,11 +100,12 @@ class BePayClient:
                 payload["user_guid"] = str(user_guid)
 
             if expires_at:
-                if hasattr(expires_at, "astimezone"):
-                    # v2.2 требует ISO 8601 в UTC — переводим явно,
-                    # иначе местное время уедет на 6 часов
-                    from datetime import timezone as _tz
-                    payload["expires_at"] = expires_at.astimezone(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                if hasattr(expires_at, "strftime"):
+                    from django.utils import timezone as dj_tz
+                    # BePay игнорирует часовой пояс и читает время как местное (Бишкек),
+                    # поэтому UTC отправлять нельзя — он посчитает срок истёкшим
+                    local = dj_tz.localtime(expires_at)
+                    payload["expires_at"] = local.strftime("%Y-%m-%dT%H:%M:%SZ")
                 else:
                     payload["expires_at"] = expires_at
 
