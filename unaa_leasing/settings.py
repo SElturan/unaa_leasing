@@ -206,9 +206,10 @@ CHANNEL_LAYERS = {
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_ACCOUNTANT_CHAT_ID = os.environ.get('TELEGRAM_ACCOUNTANT_CHAT_ID', '')
 
-BEPAY_BASE_URL = ('https://api.bepay.kg')
-BEPAY_MERCHANT_ID = ('574fbabf-8c47-4567-9be8-896921cfb7ef')
-BEPAY_SECRET_KEY = ('f1df303f-d9b3-495e-8fed-5d544a3bb211')
+BEPAY_BASE_URL = os.environ.get('BEPAY_BASE_URL')
+BEPAY_MERCHANT_ID = os.environ.get('BEPAY_MERCHANT_ID')
+BEPAY_SECRET_KEY = os.environ.get('BEPAY_SECRET_KEY')
+
 
 OSAGO_BASE_URL = os.environ.get('OSAGO_BASE_URL')   # {domain}/api от Сакбола
 OSAGO_API_KEY = os.environ.get('OSAGO_API_KEY')

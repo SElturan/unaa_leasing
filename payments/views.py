@@ -19,7 +19,7 @@ from core.telegram_notify import notify_payment_success
  
 logger = logging.getLogger(__name__)
  
-QR_LIFETIME_MINUTES = 2
+QR_LIFETIME_MINUTES = 15
  
  
 # ---------------------------------------------------------
@@ -206,7 +206,7 @@ class BePayWebhookView(APIView):
  
         try:
             payment = Payment.objects.get(
-                bepay_uuid=payload.get("qr_transaction_id") or payload["uuid"]
+                bepay_uuid=payload.get("transaction_id") or payload["uuid"]
             )
         except Payment.DoesNotExist:
             logger.warning("BePay webhook: платёж не найден, uuid=%s", payload.get("uuid"))

@@ -28,10 +28,19 @@ class PaymentSerializer(serializers.ModelSerializer):
  
  
 class BePayWebhookSerializer(serializers.Serializer):
-    """То, что BePay присылает на наш webhook-URL при смене статуса."""
+    """
+    Тело вебхука BePay v2.2. Поля qr_transaction_id больше нет —
+    вместо него transaction_id. Остальные поля новые, но необязательные.
+    """
     uuid = serializers.UUIDField()
     status = serializers.IntegerField()
-    qr_transaction_id = serializers.UUIDField(required=False)
-    amount = serializers.IntegerField(required=False)
+    transaction_id = serializers.UUIDField(required=False)
     user_guid = serializers.UUIDField(required=False)
- 
+    amount = serializers.IntegerField(required=False)
+    status_name = serializers.CharField(required=False, allow_blank=True)
+    qr_type = serializers.CharField(required=False, allow_blank=True)
+    executedDate = serializers.CharField(required=False, allow_blank=True)
+    expires_at = serializers.CharField(required=False, allow_blank=True)
+    expired = serializers.BooleanField(required=False)
+    used = serializers.BooleanField(required=False)
+    error = serializers.BooleanField(required=False)

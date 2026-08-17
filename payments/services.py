@@ -61,15 +61,35 @@ class BePayClient:
 
 
         if response.status_code >= 400:
-            raise BePayError(
-                response.status_code,
-                data.get("detail", data)
-            )
-
+            detail = self._parse_error(response)
+            raise BePayError(response.status_code, detail)
 
         return data
 
+    @staticmethod
+    def _parse_error(response) -> str:
+        """
+        В v2.2 ошибки приходят списком с указанием поля:
+        {"detail": [{"type": "validation_error", "field": "amount",
+                     "value": 0, "msg": "Parameter 'amount' must be greater than 0."}]}
+        """
+        try:
+            detail = response.json().get("detail")
+        except Exception:
+            return response.text[:300]
 
+        if isinstance(detail, list):
+            parts = []
+            for item in detail:
+                if not isinstance(item, dict):
+                    parts.append(str(item))
+                    continue
+                field = item.get("field", "")
+                msg = item.get("msg", "")
+                parts.append(f"{field}: {msg}" if field else msg)
+            return "; ".join(p for p in parts if p)
+
+        return str(detail) if detail else response.text[:300]
 
     def generate_qr(self, description, amount, expires_at=None, user_guid=None):
             payload = {
@@ -80,11 +100,11 @@ class BePayClient:
                 payload["user_guid"] = str(user_guid)
 
             if expires_at:
-                if hasattr(expires_at, "strftime"):
-                    from django.utils import timezone as dj_tz
-                    # переводим в местное время (Asia/Bishkek) перед отправкой
-                    local = dj_tz.localtime(expires_at)
-                    payload["expires_at"] = local.strftime("%Y-%m-%dT%H:%M:%S")
+                if hasattr(expires_at, "astimezone"):
+                    # v2.2 требует ISO 8601 в UTC — переводим явно,
+                    # иначе местное время уедет на 6 часов
+                    from datetime import timezone as _tz
+                    payload["expires_at"] = expires_at.astimezone(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 else:
                     payload["expires_at"] = expires_at
 
@@ -92,17 +112,5 @@ class BePayClient:
             return self._request("POST", "/qr/generate", json=payload)
 
     def get_status(self, qr_transaction_id):
-
-        return self._request(
-            "GET",
-            f"/qr/check/status/{qr_transaction_id}"
-        )
-
-
-
-    def cancel_qr(self, qr_transaction_id):
-
-        return self._request(
-            "POST",
-            f"/qr/1/tx/cancel/{qr_transaction_id}"
-        )
+        """Расширенный статус. В v2.2 путь изменился с /qr/check/status/ на /qr/status/{uuid}/details"""
+        return self._request("GET", f"/qr/status/{qr_transaction_id}/details")

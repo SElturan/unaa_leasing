@@ -17,13 +17,15 @@ class Payment(models.Model):
     STATUS_ERROR = 30
     STATUS_CANCELED = 40
     STATUS_SUCCESS = 50
- 
+    STATUS_EXPIRED = 60
+
     STATUS_CHOICES = [
         (STATUS_CREATED, "Created"),
         (STATUS_IN_PROCESS, "In process"),
         (STATUS_ERROR, "Error"),
         (STATUS_CANCELED, "Canceled"),
         (STATUS_SUCCESS, "Success"),
+        (STATUS_EXPIRED, "Expired"),
     ]
  
     PURPOSE_REPAYMENT = 'repayment'
@@ -83,8 +85,13 @@ class Payment(models.Model):
         ordering = ['-created_at']
  
     def is_final(self) -> bool:
-        return self.status in (self.STATUS_ERROR, self.STATUS_CANCELED, self.STATUS_SUCCESS)
- 
+        return self.status in (
+            self.STATUS_ERROR,
+            self.STATUS_CANCELED,
+            self.STATUS_SUCCESS,
+            self.STATUS_EXPIRED,
+        )
+    
     def __str__(self):
         return f"{self.get_purpose_display()} {self.user_guid} ({self.get_status_display()})"
  
