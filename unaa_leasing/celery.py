@@ -22,28 +22,8 @@ app.conf.beat_schedule = {
         'task': 'core.tasks.send_notification_task',
         'schedule': crontab(hour=9, minute=0),  # раз в день в 9:00
     },
-    'import_1c_every_day_16': {
-        'task': 'core.tasks.import_clients_daily',
-        'schedule': crontab(hour=16, minute=0),
-    },
         'daily_payments_summary': {
         'task': 'core.tasks.daily_payments_summary_task',
         'schedule': crontab(hour=18, minute=0),
     },
 }
-
-# app.conf.beat_schedule = {
-
-#     # Твоя старая задача
-#     'send_notifications_daily': {
-#         'task': 'core.tasks.send_notification_task',
-#         'schedule': timedelta(seconds=10),
-#     },
-
-#     # Производственный вариант — ежедневно в 16:00
-#     # (оставь закомментированным пока тестируешь)
-#     'import_1c_every_day_16': {
-#         'task': 'core.tasks.import_clients_daily',
-#         'schedule': crontab(hour=16, minute=0),
-#     },
-# }
