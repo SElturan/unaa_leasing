@@ -19,7 +19,7 @@ from core.telegram_notify import notify_payment_success
  
 logger = logging.getLogger(__name__)
  
-QR_LIFETIME_MINUTES = 30
+QR_LIFETIME_MINUTES = 15
  
  
 # ---------------------------------------------------------
