@@ -198,7 +198,8 @@ class ImportStats:
 # ГЛАВНАЯ ТОЧКА ВХОДА
 # =========================================================
 
-def import_from_1c(begin_date=None, end_date=None, customer_guid=None, customer_name=None) -> ImportStats:
+def import_from_1c(begin_date=None, end_date=None, customer_guid=None, customer_name=None,
+                   timeout=None) -> ImportStats:
     """
     Тянет данные из 1С и раскладывает по базе.
 
@@ -207,7 +208,7 @@ def import_from_1c(begin_date=None, end_date=None, customer_guid=None, customer_
     клиента не ломают весь импорт.
     """
     stats = ImportStats()
-    records = OneCClient().fetch(begin_date, end_date, customer_guid, customer_name)
+    records = OneCClient(timeout=timeout).fetch(begin_date, end_date, customer_guid, customer_name)
 
     for record in records:
         try:
@@ -427,6 +428,9 @@ def find_client_in_1c(phone_raw: str, days: int = None) -> Optional[Client]:
     import_from_1c(
         begin_date=today - timedelta(days=days),
         end_date=today + timedelta(days=days),
+        # (подключение, чтение): в сумме должно быть меньше таймаута
+        # воркера gunicorn (30 сек), иначе клиент получит 502
+        timeout=(5, settings.ONEC_REGISTRATION_TIMEOUT),
     )
 
     return Client.objects.filter(phone=phone).first()
